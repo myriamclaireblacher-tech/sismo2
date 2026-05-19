@@ -2,3 +2,6 @@ compilation : dans build -> mingw32-make
 
 exécution : sismo2.exe
 
+
+modifier "F:/stage/sundials_install" dans cmakefile
+
