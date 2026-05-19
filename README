@@ -1,0 +1,4 @@
+compilation : dans build -> mingw32-make
+
+exécution : sismo2.exe
+

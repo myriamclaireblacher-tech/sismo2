@@ -1,0 +1,14 @@
+# Ignorer le dossier de compilation locale et ses fichiers temporaires
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Ignorer les fichiers exécutables générés sous Windows
+*.exe
+*.exe.stackdump
+*.out
+
+# Ignorer les fichiers de configuration locaux de VS Code (optionnel)
+.vscode/
