@@ -10,5 +10,6 @@ Makefile
 *.exe.stackdump
 *.out
 
-# Ignorer les fichiers de configuration locaux de VS Code (optionnel)
-.vscode/
+
+# Ignorer les fichiers pdf
+*.pdf
