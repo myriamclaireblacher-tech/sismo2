@@ -13,7 +13,7 @@
 
 
 //Parameters of the fault
-struct Param{
+struct Param{  //changer en classe et calcul de constantes
     double k_a_simga;           // k/ (a sigma)
     double b_a;                 //b sigma / (a simag)
     double D_c_inv;             // 1/D_c
