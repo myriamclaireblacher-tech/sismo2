@@ -1,9 +1,8 @@
-#include <omp.h>
-#include <chrono>
-#include <cvode/cvode.h>
-#include <nvector/nvector_serial.h>
+#ifndef VARIABLES_HPP
+#define VARIABLES_HPP
+#include <random>
 
+//variables de boite.cpp
+extern double Vinf;   //taille du cube
 
-int main(){
-    cout<<"hello";
-}
+#endif
