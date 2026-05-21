@@ -16,7 +16,7 @@
 int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param fault_param){
 
 
-};
+}
 
 
 static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
@@ -31,7 +31,7 @@ static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
     ydot_data[0] = p->k_a_simga * V * (Vinf - V) + p->b_a * V * (1.0 - evolution_term) ; //dV/dt
     ydot_data[1] = 1.0 - evolution_term ;                                                // Dtheta/dt
     return 0;
-};
+}
 
 
 static int jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
@@ -42,6 +42,9 @@ static int jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
     const sunrealtype V = y_data[0];              //retrieve V
     const sunrealtype theta = y_data[1];          //retrieve theta
     sunrealtype* J_data = SUNDenseMatrix_Data(J) ;
-    j_data[0] = 
-    
-};
+    J_data[0] =   p->k_a_sigma * (-2.0 * V + Vinf ) + p->b_a - 2.0 * theta * p->coeff1 ;
+    J_data[1] =  -p->D_c_inv * theta ;
+    J_data[2] =  -V * V * p->coeff1 ;
+    J_data[3] =  -p->D_c_inv * V ;
+    return 0;
+}
