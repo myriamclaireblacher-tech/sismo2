@@ -38,4 +38,11 @@ static int jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
                void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 
+//accessories for EDO resolution
+
+static int check_retval(void* returnvalue, const char* funcname, int opt);
+
+
+
+
 #endif
