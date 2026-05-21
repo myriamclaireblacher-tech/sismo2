@@ -1,6 +1,5 @@
 #include <cstdio>
 #include "ODE.hpp"
-#include "variables.hpp"
 
 //additional general librairies
 
@@ -129,7 +128,7 @@ int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
 
     sunrealtype* ydot_data = N_VGetArrayPointer(y_dot);
     const sunrealtype evolution_term = V * theta * p->D_c_inv;
-    ydot_data[0] = p->k_a_sigma * V * (Vinf - V) + p->b_a * V * (1.0 - evolution_term) ; //dV/dt
+    ydot_data[0] = p->k_a_sigma * V * (Vinf - V) - p->b_a * V * (1.0 - evolution_term) / theta ; //dV/dt
     ydot_data[1] = 1.0 - evolution_term ;                                                // Dtheta/dt
     return 0;
 }
@@ -143,9 +142,11 @@ int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
     const sunrealtype V = y_data[0];              //retrieve V
     const sunrealtype theta = y_data[1];          //retrieve theta
     sunrealtype* J_data = SUNDenseMatrix_Data(J) ;
-    J_data[0] =   p->k_a_sigma * (-2.0 * V + Vinf ) + p->b_a - 2.0 * theta * p->coeff1 * V ;
+    const sunrealtype coeffA=1.0/theta ;
+    const sunrealtype coeffB=coeffA *p->b_a;
+    J_data[0] =   p->coeff1 * V + p->coeff2 - coeffB ;
     J_data[1] =  -p->D_c_inv * theta ;
-    J_data[2] =  -V * V * p->coeff1 ;
+    J_data[2] =  V * coeffA * coeffB ;
     J_data[3] =  -p->D_c_inv * V ;
     return 0;
 }
