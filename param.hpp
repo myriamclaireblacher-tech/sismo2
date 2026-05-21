@@ -17,9 +17,9 @@ class Param{
 
 
         //constructor with  6 parameters 
-        Param( double k_enter, double a_sigma_enter, double b_sigma_enter, double D_c_enter, double V0__enter, double Dtau_enter)
+        Param( double k_enter, double a_sigma_enter, double b_sigma_enter, double D_c_enter, double V0_enter, double Dtau_enter)
 
-        : k(k_enter), a_sigma(a_sigma_enter), b_sigma(b_sigma_enter), D_c(D_c_enter) ,V0_(V0__enter),Dtau(Dtau_enter),    
+        : k(k_enter), a_sigma(a_sigma_enter), b_sigma(b_sigma_enter), D_c(D_c_enter) ,V0_(V0_enter),Dtau(Dtau_enter),    
         k_a_sigma(k_enter/a_sigma_enter), b_a(b_sigma_enter/a_sigma_enter), D_c_inv(1.0/D_c_enter), 
         Dtau_asigma(Dtau_enter/a_sigma_enter), coeff1(b_sigma_enter/a_sigma_enter/D_c_enter)
         {}

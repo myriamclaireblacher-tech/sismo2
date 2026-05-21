@@ -7,13 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SOURCES
     main.cpp
-    EDO.cpp
-    variables.cpp
+    ODE.cpp
 )
 
 set(HEADERS
-    EDO.hpp
+    ODE.hpp
     variables.hpp
+    param.hpp
 )
 
 set(SUNDIALS_DIR "F:/stage/sundials_install")

@@ -1,12 +1,12 @@
+#include <cstdio>
 #include "ODE.hpp"
 #include "variables.hpp"
-#include "param.hpp"
 
 //additional general librairies
-#include <iostream> 
-#include <iomanip>
+
 #include <cmath>
 #include <stdio.h>
+#include <fstream> 
 
 //additional CVCode  librairies
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver      */
