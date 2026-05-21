@@ -3,4 +3,8 @@
 
 constexpr double Vinf = 0.08*100/(365*24) ; //m/an
 
+constexpr bool rapport_EDO = false ;
+
+
+
 #endif

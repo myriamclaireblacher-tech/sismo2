@@ -78,7 +78,6 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
 
     /* In loop, call CVode, print results, and test for error.
         Break out of loop when NOUT preset output times have been reached.  */
-    printf(" \nResolution of R&S\n\n");
 
     sunrealtype t;
 
@@ -90,8 +89,12 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
         if (retval == CV_SUCCESS) history_res.push_back({t,y_data[0],y_data[1]});
     }
     /* Print final statistics to the screen */
-    printf("\nFinal Statistics:\n");
-    retval = CVodePrintAllStats(cvode_mem, stdout, SUN_OUTPUTFORMAT_TABLE);
+    if (rapport_EDO)
+    {
+        printf("\nFinal Statistics:\n");
+        retval = CVodePrintAllStats(cvode_mem, stdout, SUN_OUTPUTFORMAT_TABLE);
+    }
+
 
 
     /* Write data out to the CSV file */
@@ -100,7 +103,6 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
         for (const auto& sol : history_res) {
             file << sol.t << "," << sol.V << "," << sol.theta << "\n";
         }
-        printf("\nData successfully exported to CSV (%lu lines written).\n", history_res.size());
     } else {
         printf("\nWarning: Output file stream is not open. Data not saved.\n");
     }

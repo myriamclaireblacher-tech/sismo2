@@ -47,3 +47,5 @@ add_custom_command(TARGET sismo2 POST_BUILD
     $<TARGET_FILE_DIR:sismo2>
     COMMENT "CMake : Copie automatique des DLLs de SUNDIALS (Core, Cvode, Nvec) dans le dossier build..."
 )
+
+add_compile_options(-O3)

@@ -21,7 +21,7 @@ V = data['V']
 # Si tu veux convertir V en cm/hour pour coller EXACTEMENT au graphique de l'article :
 # Actuellement V est en m/heure (car Vinf et V0 ont été divisés par 365*24)
 # Pour passer de m/heure à cm/hour, on multiplie par 100
-V_cm_hour = V * 100.0
+V_cm_hour = V 
 
 # 3. Création du graphique
 plt.figure(figsize=(8, 6))
