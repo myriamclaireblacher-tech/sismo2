@@ -21,7 +21,9 @@ int main(){
     
 
     //solver
-    ODE_solver(fichier_sortie, t_list, P_test);
+    for (int i=0;i<10000;i++){
+    //ODE_solver(fichier_sortie, t_list, P_test);
+    ODE_solver(t_list, P_test);}
 
     if (!fichier_sortie.is_open()) {
         std::cerr << "Erreur : Impossible de créer le fichier test.csv" << std::endl;

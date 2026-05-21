@@ -18,8 +18,11 @@ constexpr double RTOL = SUN_RCONST(10e-4);
 constexpr double ATOL1 = SUN_RCONST(10e-8);
 constexpr double ATOL2 = SUN_RCONST(10e-8);
 
-//ODE solver
+//ODE solver with .csv output with t_list, V_list, theta_list
 int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param& fault_param);
+
+//ODE solver with V_list as an output
+std::vector<sunrealtype> ODE_solver(const std::vector<sunrealtype>& t_list, Param& fault_param);
 
 
 //Solution of rate&state ODE for fixed t
