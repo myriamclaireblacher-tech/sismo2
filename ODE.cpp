@@ -74,7 +74,7 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
     if (check_retval(&retval, "CVodeSetLinearSolver", 1)) { return (1); }
 
     /* Set the user-supplied Jacobian routine Jac */
-    retval = CVodeSetJacFn(cvode_mem, Jac);
+    retval = CVodeSetJacFn(cvode_mem,Jac);
     if (check_retval(&retval, "CVodeSetJacFn", 1)) { return (1); }
 
     /* In loop, call CVode, print results, and test for error.
@@ -143,7 +143,7 @@ static int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
     const sunrealtype V = y_data[0];              //retrieve V
     const sunrealtype theta = y_data[1];          //retrieve theta
     sunrealtype* J_data = SUNDenseMatrix_Data(J) ;
-    J_data[0] =   p->k_a_sigma * (-2.0 * V + Vinf ) + p->b_a - 2.0 * theta * p->coeff1 ;
+    J_data[0] =   p->k_a_sigma * (-2.0 * V + Vinf ) + p->b_a - 2.0 * theta * p->coeff1 * V ;
     J_data[1] =  -p->D_c_inv * theta ;
     J_data[2] =  -V * V * p->coeff1 ;
     J_data[3] =  -p->D_c_inv * V ;

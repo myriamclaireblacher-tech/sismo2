@@ -4,6 +4,7 @@
 //general librairies
 #include <vector>
 #include <fstream>
+#include "param.hpp"
 
 
 //CVCode  librairies
@@ -18,7 +19,7 @@ constexpr double ATOL1 = SUN_RCONST(10e-8);
 constexpr double ATOL2 = SUN_RCONST(10e-8);
 
 //ODE solver
-int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param fault_param);
+int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param& fault_param);
 
 
 //Solution of rate&state ODE for fixed t
@@ -34,7 +35,7 @@ static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data);
 
 //Jacobian matrix of the RHS
 
-static int jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
+static int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
                void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 
