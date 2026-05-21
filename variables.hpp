@@ -1,8 +1,7 @@
 #ifndef VARIABLES_HPP
 #define VARIABLES_HPP
-#include <random>
 
-//variables de boite.cpp
-extern double Vinf;   //taille du cube
+constexpr double Vinf = 1.0 ;  
+
 
 #endif
