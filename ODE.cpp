@@ -1,5 +1,6 @@
 #include "ODE.hpp"
 #include "variables.hpp"
+#include "param.hpp"
 
 //additional general librairies
 #include <iostream> 
@@ -9,6 +10,7 @@
 #include <stdio.h>
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver      */
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix            */
+
 
 
 int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param fault_param){

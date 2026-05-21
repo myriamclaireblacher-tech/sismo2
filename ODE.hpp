@@ -12,15 +12,6 @@
 
 
 
-//Parameters of the fault
-struct Param{  //changer en classe et calcul de constantes
-    double k_a_simga;           // k/ (a sigma)
-    double b_a;                 //b sigma / (a simag)
-    double D_c_inv;             // 1/D_c
-    double exp_Dtau_asigma;     //exp (Delta Tau/ (a sigma) )
-    double V0_;                 // V0_
-};    
-
 //ODE solver
 int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Param fault_param);
 
