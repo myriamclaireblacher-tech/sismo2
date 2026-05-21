@@ -31,17 +31,17 @@ struct SolValues{
 
 
 //right hand side (RHS) of the EDO to resolve
-static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data);
+int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data);
 
 //Jacobian matrix of the RHS
 
-static int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
+int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
                void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 
 //accessories for EDO resolution
 
-static int check_retval(void* returnvalue, const char* funcname, int opt);
+int check_retval(void* returnvalue, const char* funcname, int opt);
 
 
 

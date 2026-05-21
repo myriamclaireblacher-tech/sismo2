@@ -1,4 +1,4 @@
-compilation : dans build -> mingw32-make
+compilation : dans build -> (mingw32-make clean) mingw32-make
 
 exécution : sismo2.exe
 
@@ -9,3 +9,14 @@ modifier "F:/stage/sundials_install" dans cmakefile
 
 Ex CV code openMP https://github.com/ufz/cvode/blob/master/examples/nvector/openmp/test_nvector_openmp.c
 Ex CV en série https://github.com/llnl/sundials/blob/main/examples/cvode/serial/cvRoberts_dns.c 
+
+nécessitent 
+
+libgcc_s_seh-1.dll
+
+libstdc++-6.dll
+
+libwinpthread-1.dll
+de minGW
+
+et 

@@ -120,7 +120,7 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
 }
 
 
-static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
+int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
     Param* p = static_cast<Param*>(user_data);
 
     const sunrealtype* y_data = N_VGetArrayPointer(y);
@@ -135,7 +135,7 @@ static int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
 }
 
 
-static int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
+int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
                void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3){
     
     Param* p = static_cast<Param*>(user_data);
@@ -152,7 +152,7 @@ static int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
 
 //accessories for EDO resolution
 
-static int check_retval(void* returnvalue, const char* funcname, int opt)
+int check_retval(void* returnvalue, const char* funcname, int opt)
 {
   int* retval;
 
