@@ -10,8 +10,8 @@ int main(){
     for (int i=0; i<300; ++i){
         t_list[i]=5.0/300.0*i;
     }
-    std::vector<sunrealtype> V_list;
-    std::vector<sunrealtype> slip_list;
+    std::vector<sunrealtype> V_list(t_list.size());
+    std::vector<sunrealtype> slip_list(t_list.size());
 
     std::ofstream fichier_sortie("test.csv");
     
@@ -22,7 +22,7 @@ int main(){
     auto timeStart = std::chrono::high_resolution_clock::now();
     for (int j=0 ; j<10000; ++j){
         F.ODE_solver(t_list, V_list,  P_test);
-        compute_slip(slip_list, t_list, V_list);
+        //compute_slip(slip_list, t_list, V_list);
     }
     //solver
     
@@ -36,7 +36,7 @@ int main(){
     double timeTotal = duration.count();
     std::cout<<"\nTIME  : "<<timeTotal<<"\n";
 
-    save_to_csv(fichier_sortie, t_list, slip_list,V_list);
+    //save_to_csv(fichier_sortie, t_list, slip_list,V_list);
 
     
         

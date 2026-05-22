@@ -49,9 +49,9 @@ Fault::~Fault(){
 int Fault::ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param){
     const sunrealtype V1 = fault_param.V0_ * std::exp(fault_param.Dtau_asigma) ; //initial slip rate 
     const sunrealtype theta1 = 1.0/(fault_param.D_c_inv * fault_param.V0_ ); //initial theta
-    V_list.clear();                 // 1. On vide COMPLÈTEMENT le vecteur
-    V_list.reserve(t_list.size());  // 2. On alloue la mémoire brute pour 300 points
-    V_list.push_back(V1);
+    //V_list.clear();                 // 1. On vide COMPLÈTEMENT le vecteur
+    //V_list.reserve(t_list.size());  // 2. On alloue la mémoire brute pour 300 points
+    V_list[0]=V1;
 
     sunrealtype* y_data = N_VGetArrayPointer(this->y); 
     y_data[0] = V1 ;   //slip rate component for fixed time t=1
@@ -69,7 +69,7 @@ int Fault::ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrea
     for (int i=1; i<t_list.size(); ++i){
         retval = CVode(cvode_mem, t_list[i], y, &t, CV_NORMAL);
         if (check_retval(&retval, "CVode", 1)) { break; }
-        if (retval == CV_SUCCESS) V_list.push_back(y_data[0]);
+        if (retval == CV_SUCCESS) V_list[i]=y_data[0];
     }
     /* Print final statistics to the screen */
     if (rapport_EDO)
@@ -131,11 +131,9 @@ int Fault::ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_lis
 
 //compute slip
 void compute_slip(std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& V_list){
-    slip_list.clear();
-    slip_list.reserve(t_list.size());
-    slip_list.push_back(0.0) ; //slip value at value t=0
+    slip_list[0]=0.0 ; //slip value at value t=0
     for (int i=0; i<t_list.size()-1; ++i){
-        slip_list.push_back( slip_list[i]+ 0.5 * (V_list[i] + V_list[i+1]) * ( t_list[i+1] - t_list [i]) ) ;
+        slip_list[i+1]=slip_list[i]+ 0.5 * (V_list[i] + V_list[i+1]) * ( t_list[i+1] - t_list [i])  ;
     }
     ;}
 
