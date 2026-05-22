@@ -11,6 +11,7 @@
 #include <cvode/cvode.h>            /* prototypes for CVODE fcts., consts.  */
 #include <nvector/nvector_serial.h> /* access to serial N_Vector            */
 
+
 constexpr sunindextype NEQ = 2 ; //number of equations to solve
 
 //precision for EDO resolution
