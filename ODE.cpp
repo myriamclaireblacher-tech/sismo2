@@ -69,11 +69,11 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, Para
     if (check_retval((void*)LS, "SUNLinSol_Dense", 0)) { return (1); }
 
     /* Attach the matrix and linear solver */
-    retval = CVodeSetLinearSolver(cvode_mem, LS, A); /////////////////////////
+    retval = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (check_retval(&retval, "CVodeSetLinearSolver", 1)) { return (1); }
 
     /* Set the user-supplied Jacobian routine Jac */
-    retval = CVodeSetJacFn(cvode_mem,Jac); ////////////////////////////////////////
+    retval = CVodeSetJacFn(cvode_mem,Jac); 
     if (check_retval(&retval, "CVodeSetJacFn", 1)) { return (1); }
 
     /* In loop, call CVode, print results, and test for error.
