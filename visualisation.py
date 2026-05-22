@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # 1. Chargement des données du fichier CSV
 try:
     # On lit le fichier généré par ton code C++
-    data = pd.read_csv('build/test.csv')
+    data = pd.read_csv('test.csv')
 except FileNotFoundError:
     print("Erreur : Le fichier 'test.csv' n'a pas été trouvé dans le dossier build.")
     print("Assure-toi d'avoir bien exécuté sismo2.exe d'abord.")
