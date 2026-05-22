@@ -34,10 +34,9 @@ class Fault{
     
         ~Fault();
         
-        //create 
-        std::vector<sunrealtype> V_list_create(const std::vector<sunrealtype>& t_list);
+        
         int ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param);
-        int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list,  Param& fault_param);
+        int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, const Param& fault_param);
 };
 
 

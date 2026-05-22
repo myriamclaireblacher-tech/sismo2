@@ -11,7 +11,7 @@
 #include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver      */
 #include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix            */
 
-Fault::Fault{
+Fault::Fault(){
                 int retval = SUNContext_Create(SUN_COMM_NULL, &this->sunctx);
                 if (check_retval(&retval, "SUNContext_Create", 1)){ throw std::runtime_error("\nError : cannot create SUNContext.");}
                 this->y=N_VNew_Serial(NEQ, this->sunctx);
@@ -37,7 +37,7 @@ Fault::Fault{
                 if (check_retval(&retval, "CVodeSetJacFn", 1)) { throw std::runtime_error("\nError : cannot attach Jacobian."); }
         }
 
-~Fault::Fault(){    
+Fault::~Fault(){    
             if (this->LS)        SUNLinSolFree(this->LS);           /* Free the linear solver memory */
             if (this->A)         SUNMatDestroy(this->A);            /* Free the matrix memory */
             if (this->cvode_mem) CVodeFree(&this->cvode_mem);       /* Free CVODE memory */
@@ -45,23 +45,23 @@ Fault::Fault{
             if (this->y)         N_VDestroy(this->y);               /* Free y vector */
             if (this->sunctx)    SUNContext_Free(&this->sunctx);    /* Free the SUNDIALS context */}
 
-std::vector<sunrealtype> V_list_create(const std::vector<sunrealtype>& t_list){
-    std::vector<sunrealtype> V_list;
-    V_list.reserve(t_list.size());
-    return V_list;
-}
 
-int ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param){
-    const sunrealtype V1 = fault_param->V0_ * std::exp(fault_param->Dtau_asigma) ; //initial slip rate 
-    const sunrealtype theta1 = 1.0/(fault_param->D_c_inv * fault_param->V0_ ); //initial theta
-    v_list[0] = V1 ;
+int Fault::ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param){
+    const sunrealtype V1 = fault_param.V0_ * std::exp(fault_param.Dtau_asigma) ; //initial slip rate 
+    const sunrealtype theta1 = 1.0/(fault_param.D_c_inv * fault_param.V0_ ); //initial theta
+    V_list.clear();                 // 1. On vide COMPLÈTEMENT le vecteur
+    V_list.reserve(t_list.size());  // 2. On alloue la mémoire brute pour 300 points
+    V_list.push_back(V1);
 
-    sunrealtype* y_data = N_VGetArrayPointer(this->y); /////////////////////////////////
+    sunrealtype* y_data = N_VGetArrayPointer(this->y); 
     y_data[0] = V1 ;   //slip rate component for fixed time t=1
     y_data[1] = theta1 ;  //state variable component for fixed time t=0
 
+    int retval = CVodeReInit(cvode_mem, SUN_RCONST(0.0), this->y);
+    if (check_retval(&retval, "CVodeReInit", 1)) { return retval; }
+
     // parameters of the fault
-    retval = CVodeSetUserData(this->cvode_mem, const_cast<Param*>(&fault_param)); ///////////////
+    retval = CVodeSetUserData(this->cvode_mem, const_cast<Param*>(&fault_param)); 
     if (check_retval(&retval, "CVodeSetUserData", 1)) { return 1; }
 
     sunrealtype t;
@@ -69,7 +69,7 @@ int ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>&
     for (int i=1; i<t_list.size(); ++i){
         retval = CVode(cvode_mem, t_list[i], y, &t, CV_NORMAL);
         if (check_retval(&retval, "CVode", 1)) { break; }
-        if (retval == CV_SUCCESS) V_list[i]=y_data[0];
+        if (retval == CV_SUCCESS) V_list.push_back(y_data[0]);
     }
     /* Print final statistics to the screen */
     if (rapport_EDO)
@@ -81,24 +81,28 @@ int ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>&
     return (retval);
 }
 
-int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list,  Param& fault_param){
+int Fault::ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list,  const Param& fault_param){
 
-    const sunrealtype V1 = fault_param->V0_ * std::exp(fault_param->Dtau_asigma) ; //initial slip rate 
-    const sunrealtype theta1 = 1.0/(fault_param->D_c_inv * fault_param->V0_ ); //initial theta
+    const sunrealtype V1 = fault_param.V0_ * std::exp(fault_param.Dtau_asigma) ; //initial slip rate 
+    const sunrealtype theta1 = 1.0/(fault_param.D_c_inv * fault_param.V0_ ); //initial theta
 
 
-    sunrealtype* y_data = N_VGetArrayPointer(this->y); /////////////////////////////////
+    sunrealtype* y_data = N_VGetArrayPointer(this->y); 
     y_data[0] = V1 ;   //slip rate component for fixed time t=1
     y_data[1] = theta1 ;  //state variable component for fixed time t=0
 
+    retval = CVodeReInit(cvode_mem, SUN_RCONST(0.0), this->y);
+    if (check_retval(&retval, "CVodeReInit", 1)) { return retval; }
+
     // parameters of the fault
-    retval = CVodeSetUserData(this->cvode_mem, const_cast<Param*>(&fault_param)); ///////////////
+    int retval = CVodeSetUserData(this->cvode_mem, const_cast<Param*>(&fault_param)); 
     if (check_retval(&retval, "CVodeSetUserData", 1)) { return 1; }
 
     sunrealtype t;
 
     std::vector<SolValues> history_res;
     history_res.reserve(t_list.size());
+    history_res.push_back({0.0, V1, theta1}); // Sauvegarde de t=0
     for (int i=1; i<t_list.size(); ++i){
         retval = CVode(this->cvode_mem, t_list[i], this->y, &t, CV_NORMAL);
         if (check_retval(&retval, "CVode", 1)) { break; }
@@ -125,3 +129,72 @@ int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list,  Par
 
 }
 
+//RHS
+int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
+    Param* p = static_cast<Param*>(user_data);
+
+    const sunrealtype* y_data = N_VGetArrayPointer(y);
+    const sunrealtype V = y_data[0];
+    const sunrealtype theta = y_data[1];
+
+    sunrealtype* ydot_data = N_VGetArrayPointer(y_dot);
+    const sunrealtype evolution_term = V * theta * p->D_c_inv;
+    ydot_data[0] = p->k_a_sigma * V * (Vinf - V) - p->b_a * V * (1.0 - evolution_term) / theta ; //dV/dt
+    ydot_data[1] = 1.0 - evolution_term ;                                                // Dtheta/dt
+    return 0;
+}
+
+//Jacobian of the RHS
+int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
+               void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3){
+    
+    Param* p = static_cast<Param*>(user_data);
+    const sunrealtype* y_data = N_VGetArrayPointer(y);
+    const sunrealtype V = y_data[0];              //retrieve V
+    const sunrealtype theta = y_data[1];          //retrieve theta
+    sunrealtype* J_data = SUNDenseMatrix_Data(J) ;
+    const sunrealtype coeffA=1.0/theta ;
+    const sunrealtype coeffB=coeffA *p->b_a;
+    J_data[0] =   p->coeff1 * V + p->coeff2 - coeffB ;
+    J_data[1] =  -p->D_c_inv * theta ;
+    J_data[2] =  V * coeffA * coeffB ;
+    J_data[3] =  -p->D_c_inv * V ;
+    return 0;
+}
+
+//accessories for EDO resolution
+
+int check_retval(void* returnvalue, const char* funcname, int opt)
+{
+  int* retval;
+
+  /* Check if SUNDIALS function returned NULL pointer - no memory allocated */
+  if (opt == 0 && returnvalue == NULL)
+  {
+    fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n",
+            funcname);
+    return (1);
+  }
+
+  /* Check if retval < 0 */
+  else if (opt == 1)
+  {
+    retval = (int*)returnvalue;
+    if (*retval < 0)
+    {
+      fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n",
+              funcname, *retval);
+      return (1);
+    }
+  }
+
+  /* Check if function returned NULL pointer - no memory allocated */
+  else if (opt == 2 && returnvalue == NULL)
+  {
+    fprintf(stderr, "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n",
+            funcname);
+    return (1);
+  }
+
+  return (0);
+}
