@@ -10,31 +10,34 @@ int main(){
     for (int i=0; i<300; ++i){
         t_list[i]=5.0/300.0*i;
     }
+    std::vector<sunrealtype> V_list;
+    std::vector<sunrealtype> slip_list;
 
     std::ofstream fichier_sortie("test.csv");
     
-    //auto timeStart = std::chrono::high_resolution_clock::now();
-            
+    
     
     Fault F;
-    F.ODE_solver(fichier_sortie, t_list,  P_test);
+
+    auto timeStart = std::chrono::high_resolution_clock::now();
+    for (int j=0 ; j<10000; ++j){
+        F.ODE_solver(t_list, V_list,  P_test);
+        compute_slip(slip_list, t_list, V_list);
+    }
     //solver
     
     //ODE_solver(fichier_sortie, t_list, P_test);
     //ODE_solver(t_list, P_test);}
 
-    if (!fichier_sortie.is_open()) {
-        std::cerr << "Erreur : Impossible de créer le fichier test.csv" << std::endl;
-        return 1;
-        fichier_sortie.close();
-    }
     
-    /*
+    
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
     double timeTotal = duration.count();
     std::cout<<"\nTIME  : "<<timeTotal<<"\n";
-    */
+
+    save_to_csv(fichier_sortie, t_list, slip_list,V_list);
+
     
         
     // 5. Fermeture du fichier

@@ -139,6 +139,19 @@ void compute_slip(std::vector<sunrealtype>& slip_list, const std::vector<sunreal
     }
     ;}
 
+//save to csv
+void save_to_csv(std::ofstream& file, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& V_list){
+    if (file.is_open()) {
+        file << "Time,slip,V\n"; // CSV Header
+        for (size_t i = 0; i < t_list.size(); ++i) {
+            file << t_list[i] << "," << slip_list[i]<< "," << V_list[i] << "\n";
+        }
+        file.close(); 
+    } else {
+        fprintf(stderr, "\nWarning: Could not open file. Data not saved.\n");
+    }
+}
+
 //RHS
 int f(sunrealtype t, N_Vector y, N_Vector y_dot, void *user_data){
     Param* p = static_cast<Param*>(user_data);
@@ -173,7 +186,6 @@ int Jac(sunrealtype t, N_Vector y, N_Vector fy, SUNMatrix J,
 }
 
 //accessories for EDO resolution
-
 int check_retval(void* returnvalue, const char* funcname, int opt)
 {
   int* retval;
