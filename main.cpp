@@ -2,47 +2,39 @@
 #include <iostream>
 #include <chrono>
 
+#include <fstream>
+#include <Eigen/Dense>
 
-int main(){
-    Param P_test(0.01, 0.4, 0.17, 0.1, 0.08*100/(365*24), 2.0);
-    // double k_enter, double a_sigma_enter, double b_sigma_enter, double D_c_enter, double V0_enter, double Dtau_enter
-    std::vector<sunrealtype> t_list(300);
-    for (int i=0; i<300; ++i){
-        t_list[i]=5.0/300.0*i;
+int main() {
+
+    Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
+
+    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix.txt");
+    if (!file.is_open()) {
+        std::cerr << "Erreur : Impossible d'ouvrir le fichier." << std::endl;
+        return 1;
     }
-    std::vector<sunrealtype> V_list(t_list.size());
-    std::vector<sunrealtype> slip_list(t_list.size());
 
-    std::ofstream fichier_sortie("test.csv");
-    
-    
-    
-    Fault F;
+    for (int i = 0; i < G.rows(); ++i) {
+            for (int j = 0; j < G.cols(); ++j) {
+                if (!(file >> G(i, j))) {
+                    std::cerr << "Erreur : Format de fichier incorrect ou données insuffisantes." << std::endl;
+                    return 1;
+                }
+            }
+        }
 
-    auto timeStart = std::chrono::high_resolution_clock::now();
-    for (int j=0 ; j<10000; ++j){
-        F.ODE_solver(t_list, V_list,  P_test);
-        //compute_slip(slip_list, t_list, V_list);
-    }
-    //solver
-    
-    //ODE_solver(fichier_sortie, t_list, P_test);
-    //ODE_solver(t_list, P_test);}
+    file.close();
 
-    
-    
-    auto timeEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = timeEnd - timeStart;
-    double timeTotal = duration.count();
-    std::cout<<"\nTIME  : "<<timeTotal<<"\n";
 
-    //save_to_csv(fichier_sortie, t_list, slip_list,V_list);
 
-    
-        
-    // 5. Fermeture du fichier
-    
-    
-    std::cout << "Simulation terminee avec succes !" << std::endl;
+
+    /*
+    // Calcul optimisé
+    C.noalias() = A * B;
+
+    // Affichage du premier élément pour valider (doit valider 450 * 1 * 2 = 900)
+    std::cout << "Element C(0,0) = " << C(0,0) << " (Attendu: 900)" << std::endl;
+        */
     return 0;
 }

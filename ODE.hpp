@@ -34,13 +34,15 @@ class Fault{
     
         ~Fault();
         
-        
         int ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param);
         int ODE_solver(std::ofstream& file, const std::vector<sunrealtype>& t_list, const Param& fault_param);
 };
 
 //slip_list computed with V_list, starting at 0
 void compute_slip(std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& V_list);
+
+//Surf
+
 
 //t_list, slip_list and v_list to csv
 void save_to_csv(std::ofstream& file, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& V_list);

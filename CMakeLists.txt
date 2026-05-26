@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SUNDIALS_DIR "F:/stage/sundials_install")
 set(CMAKE_PREFIX_PATH ${SUNDIALS_DIR})
 
+#adding eigen
+# (Note : Un dossier de build est requis par CMake car Eigen est en dehors du projet)
+add_subdirectory("F:/stage/eigen" "${CMAKE_CURRENT_BINARY_DIR}/eigen_build")
+
 # 2. CONFIGURATION DES SOURCES
 set(SOURCES
     main.cpp
@@ -32,6 +36,9 @@ add_executable(sismo2 ${SOURCES} ${HEADERS})
 target_include_directories(sismo2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(sismo2 PUBLIC SUNDIALS::cvode SUNDIALS::nvecserial)
 
+# Lier Eigen à votre exécutable (Corrigé pour cibler sismo2 après sa création)
+target_link_libraries(sismo2 PRIVATE Eigen3::Eigen)
+
 # =========================================================================
 # AUTOMATISATION DE LA COPIE DES DLLs (OPTION 2 COMPLET)
 # =========================================================================
@@ -48,4 +55,11 @@ add_custom_command(TARGET sismo2 POST_BUILD
     COMMENT "CMake : Copie automatique des DLLs de SUNDIALS (Core, Cvode, Nvec) dans le dossier build..."
 )
 
-add_compile_options(-O3)
+# Gestion des flags d'optimisation selon le compilateur pour éviter les erreurs
+if(MSVC)
+    target_compile_options(sismo2 PRIVATE /O2 /arch:AVX2)
+    target_compile_definitions(sismo2 PRIVATE NDEBUG)
+else()
+    target_compile_options(sismo2 PRIVATE -O3 -march=native)
+    target_compile_definitions(sismo2 PRIVATE NDEBUG)
+endif()
