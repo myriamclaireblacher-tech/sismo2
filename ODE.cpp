@@ -137,6 +137,15 @@ void compute_slip(std::vector<sunrealtype>& slip_list, const std::vector<sunreal
     }
     ;}
 
+void compute_slip(Eigen::Ref<Eigen::RowVectorXd> slip_list, 
+                  const std::vector<sunrealtype>& t_list, 
+                  const std::vector<sunrealtype>& V_list) {
+    slip_list[0] = 0.0;
+    for (size_t i = 0; i < t_list.size() - 1; ++i) {
+        slip_list[i+1] = slip_list[i] + 0.5 * (V_list[i] + V_list[i+1]) * (t_list[i+1] - t_list[i]);
+    }
+};
+
 //save to csv
 void save_to_csv(std::ofstream& file, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& V_list){
     if (file.is_open()) {

@@ -24,6 +24,7 @@ set(HEADERS
     ODE.hpp
     variables.hpp
     param.hpp
+    Surface_responce.hpp
 )
 
 # 3. RECHERCHE DE SUNDIALS

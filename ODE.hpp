@@ -12,6 +12,8 @@
 #include <cvode/cvode.h>            /* prototypes for CVODE fcts., consts.  */
 #include <nvector/nvector_serial.h> /* access to serial N_Vector            */
 
+//Eigen librairies
+#include <Eigen/Dense>
 
 constexpr sunindextype NEQ = 2 ; //number of equations to solve
 
@@ -41,7 +43,7 @@ class Fault{
 //slip_list computed with V_list, starting at 0
 void compute_slip(std::vector<sunrealtype>& slip_list, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& V_list);
 
-//Surf
+void compute_slip(Eigen::Ref<Eigen::RowVectorXd> slip_list, const std::vector<sunrealtype>& t_list, const std::vector<sunrealtype>& V_list);
 
 
 //t_list, slip_list and v_list to csv
