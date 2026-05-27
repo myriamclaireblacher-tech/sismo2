@@ -14,6 +14,9 @@ set(CMAKE_PREFIX_PATH ${SUNDIALS_DIR})
 # (Note : Un dossier de build est requis par CMake car Eigen est en dehors du projet)
 add_subdirectory("F:/stage/eigen" "${CMAKE_CURRENT_BINARY_DIR}/eigen_build")
 
+#ading OpenMP
+find_package(OpenMP REQUIRED)
+
 # 2. CONFIGURATION DES SOURCES
 set(SOURCES
     main.cpp
@@ -24,7 +27,7 @@ set(HEADERS
     ODE.hpp
     variables.hpp
     param.hpp
-    Surface_responce.hpp
+    Surface_response.hpp
 )
 
 # 3. RECHERCHE DE SUNDIALS
@@ -39,6 +42,9 @@ target_link_libraries(sismo2 PUBLIC SUNDIALS::cvode SUNDIALS::nvecserial)
 
 # Lier Eigen à votre exécutable (Corrigé pour cibler sismo2 après sa création)
 target_link_libraries(sismo2 PRIVATE Eigen3::Eigen)
+
+#Lier OpenMP à l'éxécutable
+target_link_libraries(sismo2 PRIVATE OpenMP::OpenMP_CXX)
 
 # =========================================================================
 # AUTOMATISATION DE LA COPIE DES DLLs (OPTION 2 COMPLET)
@@ -55,6 +61,8 @@ add_custom_command(TARGET sismo2 POST_BUILD
     $<TARGET_FILE_DIR:sismo2>
     COMMENT "CMake : Copie automatique des DLLs de SUNDIALS (Core, Cvode, Nvec) dans le dossier build..."
 )
+
+target_compile_options(sismo2 PRIVATE ${OpenMP_CXX_FLAGS})
 
 # Gestion des flags d'optimisation selon le compilateur pour éviter les erreurs
 if(MSVC)
