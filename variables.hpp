@@ -9,6 +9,6 @@ constexpr int Nstations = 2 ;
 
 constexpr int NSubFaults = 450 ;
 
-
+constexpr int NCPU = 6 ;
 
 #endif

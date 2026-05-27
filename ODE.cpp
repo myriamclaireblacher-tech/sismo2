@@ -46,6 +46,43 @@ Fault::~Fault(){
             if (this->sunctx)    SUNContext_Free(&this->sunctx);    /* Free the SUNDIALS context */}
 
 
+int Fault::ODE_solver(const std::vector<sunrealtype>& t_list, Eigen::Ref<Eigen::RowVectorXd> slip_list, const Param& fault_param){
+    const sunrealtype V1 = fault_param.V0_ * std::exp(fault_param.Dtau_asigma) ; //initial slip rate 
+    const sunrealtype theta1 = 1.0/(fault_param.D_c_inv * fault_param.V0_ ); //initial theta
+
+    sunrealtype* y_data = N_VGetArrayPointer(this->y); 
+    y_data[0] = V1 ;   //slip rate component for fixed time t=1
+    y_data[1] = theta1 ;  //state variable component for fixed time t=0
+
+    int retval = CVodeReInit(cvode_mem, SUN_RCONST(0.0), this->y);
+    if (check_retval(&retval, "CVodeReInit", 1)) { return retval; }
+
+    // parameters of the fault
+    retval = CVodeSetUserData(this->cvode_mem, const_cast<Param*>(&fault_param)); 
+    if (check_retval(&retval, "CVodeSetUserData", 1)) { return 1; }
+
+    sunrealtype t;
+    sunrealtype Vprev=V1;
+    slip_list[0] = 0.0 ;
+
+    for (int i=1; i<t_list.size(); ++i){
+        retval = CVode(cvode_mem, t_list[i], y, &t, CV_NORMAL);
+        if (check_retval(&retval, "CVode", 1)) { break; }
+        if (retval == CV_SUCCESS) {
+            sunrealtype V_new = y_data[0] ;
+            slip_list[i]=slip_list[i-1]+ 0.5 * (V_new + Vprev) * (t_list[i] - t_list[i-1]);
+            Vprev=V_new; }
+    }
+    /* Print final statistics to the screen */
+    if (rapport_EDO)
+    {
+        printf("\nFinal Statistics:\n");
+        retval = CVodePrintAllStats(cvode_mem, stdout, SUN_OUTPUTFORMAT_TABLE);
+    }
+
+    return (retval);
+}
+
 int Fault::ODE_solver(const std::vector<sunrealtype>& t_list, std::vector<sunrealtype>& V_list, const Param& fault_param){
     const sunrealtype V1 = fault_param.V0_ * std::exp(fault_param.Dtau_asigma) ; //initial slip rate 
     const sunrealtype theta1 = 1.0/(fault_param.D_c_inv * fault_param.V0_ ); //initial theta

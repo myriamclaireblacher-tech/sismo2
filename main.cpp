@@ -27,8 +27,7 @@ int main() {
     std::cout<<"done \n";
     
     std::cout<<"define data storage : ";
-    int nb_coeurs_physiques = Eigen::nbThreads();
-    omp_set_num_threads(nb_coeurs_physiques);
+    omp_set_num_threads(6);
     const int nb_threads = omp_get_max_threads();
     
     //omp_set_num_threads(1);
@@ -53,11 +52,8 @@ int main() {
             pP.emplace_back(k_variable, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
     }
 
-    std::vector<ThreadWorkspace> workspaces(nb_threads);
-    for (int i=0; i<nb_threads; i++){
-        workspaces[i].V_list.resize(t_list.size());
-
-    }
+    std::vector<Fault> Fault_per_thread;
+    Fault_per_thread.resize(nb_threads);
 
     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix(3*Nstations, t_list.size());
     Eigen::Matrix<double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> storage_matrix(NSubFaults, t_list.size());
@@ -66,8 +62,9 @@ int main() {
     std::cout<<" done \n";
     std::cout<<"compute surface displacement : ";
     auto timeStart = std::chrono::high_resolution_clock::now();
+    
     for (int j=0;j<1000;j++){
-    surface_response(pP,  t_list,  workspaces, G, RES_matrix,  storage_matrix);}
+    surface_response(pP,  t_list,  Fault_per_thread, G, RES_matrix,  storage_matrix);}
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;

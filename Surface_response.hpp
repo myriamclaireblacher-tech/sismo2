@@ -4,15 +4,10 @@
 #include "ODE.hpp"
 #include <omp.h>
 
-//one for each thread
-//alignas to solve datarace issues and improve performance
-struct alignas(64) ThreadWorkspace {
-    Fault fault_solver;
-    std::vector<sunrealtype> V_list;
-};
+
 
 int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,  
-                        std::vector<ThreadWorkspace>& workspaces,
+                        std::vector<Fault>& fault_per_thread,
                         Eigen::Matrix<double,3*Nstations,NSubFaults>& G, 
                         Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix, 
                         Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
@@ -20,17 +15,17 @@ int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,
     #pragma omp parallel 
     {
         //get thread data
-        int tid = omp_get_thread_num(); 
-        ThreadWorkspace& ws = workspaces[tid];
-        #pragma omp for
+        
+        
+        #pragma omp for schedule(dynamic, 10) 
             for (size_t i = 0; i < NSubFaults; i++)
-            {   ws.fault_solver.ODE_solver(t_list, ws.V_list, pP[i]);
-                compute_slip( storage_matrix.row(i) , t_list , ws.V_list);}
+            {   int tid = omp_get_thread_num(); 
+                fault_per_thread[tid].ODE_solver(t_list, storage_matrix.row(i), pP[i]);}
+            
     }
-    
     //RES_matrix.noalias() = G * storage_matrix ;
      
-    
+        
    return 0;       
 }
 #endif
