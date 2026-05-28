@@ -23,8 +23,8 @@ int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,
                 fault_per_thread[tid].ODE_solver(t_list, storage_matrix.row(i), pP[i]);}
             
     }
-    //RES_matrix.noalias() = G * storage_matrix ;
-     
+    
+    RES_matrix.noalias() = G * storage_matrix ;
         
    return 0;       
 }
