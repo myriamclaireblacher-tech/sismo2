@@ -27,7 +27,6 @@ int main() {
     std::cout<<"done \n";
     
     std::cout<<"define data storage : ";
-    omp_set_num_threads(6);
     const int nb_threads = omp_get_max_threads();
     
     //omp_set_num_threads(1);
