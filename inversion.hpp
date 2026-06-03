@@ -25,10 +25,7 @@ struct PT_param {
     {}   
 }
 
-int parallel_tempering(const int maxint, PT_param PT, int seed=42){
-
-    
-
+int parallel_tempering(const int maxint, const PT_param PT, int seed=42){
 
     //Design the proposal covariance matrix
     cov = np.identity(nparams) * sigma
@@ -36,7 +33,7 @@ int parallel_tempering(const int maxint, PT_param PT, int seed=42){
 
     //Temperatures of the chains
     std::mt19937 gen(seed); //generate random
-    std::vector<double> T_log(nchains);
+    std::vector<double> T_log(nchains); 
     std::uniform_real_distribution<double> log_temp(0.0 , std::log(PT.T_max));
 
     for (int i=0;i<PT.nchains;i++){
@@ -44,6 +41,18 @@ int parallel_tempering(const int maxint, PT_param PT, int seed=42){
         else T_log[i]= log_temp(gen) ;
 
     }
+
+    //Initial models of the chains
+    std::vector<Param> P;
+    P.reserve(PT.nchains);
+    for (int i=0;i<PT.nchains;i++){
+        double p1 = PT.k_a_sigma_inf + unif_dist(gen) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
+        double p2 = PT.b_a_inf +     unif_dist(gen) * (PT.b_a_sup - PT.b_a_inf );
+        double p3 = PT.D_c_inv_inf + unif_dist(gen) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
+        double p4 = PT.Dtau_asigma_inf + unif_dist(gen) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
+        P.push_back(Param(p1, p2, p3, p4));
+    }
+
 
 
 
