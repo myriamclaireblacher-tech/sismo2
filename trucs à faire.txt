@@ -1,0 +1,1 @@
+CVodeSetMaxNumSteps(this->cvode_mem, 5000); //limiter le nombre d'étapes edo à 5000
