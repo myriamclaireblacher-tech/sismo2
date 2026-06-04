@@ -61,11 +61,11 @@ struct ColdChainSaver {
 };
 
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
-                    Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work,double T){
+                    Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
     int SR = surface_response(work.pP, t_list, work.Faults, G, work.RES_matrix, work.storage_matrix);
-    if (SR!=0) return -std::numeric_limits<double>::infinity();
-    double llk = - (data - work.RES_matrix).array().square().sum()/T;
+    if (SR!=0) return std::isnan;
+    double llk = - (data - work.RES_matrix).array().square().sum();
     return llk;
 };
 
@@ -101,60 +101,130 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
 
     }
 
+    //likelihood data storage
+    std:vector<double> llk ;
+    llk.resize(PT.ncold);
+
     //Initial models of the chains
-    std::vector<Param> P;
-    P.reserve(PT.nchains);
-    for (int i=0;i<PT.nchains;i++){
-        double p1 = PT.k_a_sigma_inf + unif_dist(gen) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
-        double p2 = PT.b_a_inf +     unif_dist(gen) * (PT.b_a_sup - PT.b_a_inf );
-        double p3 = PT.D_c_inv_inf + unif_dist(gen) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
-        double p4 = PT.Dtau_asigma_inf + unif_dist(gen) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
-        P.push_back(Param(p1, p2, p3, p4));
+    std::vector<Param> M;
+    M.resize(PT.nchains*NSubFaults);
+    #pragma omp parallel {
+        ThreadWorkspace& work = workspaces[omp_get_thread_num()]; 
+
+        #pragma omp for
+        for (int i=0;i<PT.nchains*NSubFaults;i++){
+            double p1 = PT.k_a_sigma_inf + unif_dist(gen) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
+            double p2 = PT.b_a_inf +     unif_dist(gen) * (PT.b_a_sup - PT.b_a_inf );
+            double p3 = PT.D_c_inv_inf + unif_dist(gen) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
+            double p4 = PT.Dtau_asigma_inf + unif_dist(gen) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
+            M[i]=Param(p1, p2, p3, p4);
+        }
+
+        //save initial models in files for cold chains
+        #pragma omp for
+        for (int i=0;i<PT.ncold;i++){
+            work.pP.assign(M.begin() + (i * NSubFaults), 
+                           M.begin() + ((i + 1) * NSubFaults));
+            double llk_i = compute_llk(t_list, data, G , work);
+            if (i<PT.ncold) save_step(work.pP, llk_i);
+            llk[i]=llk_i;
+        }
     }
-
-    //save initial models in files for cold chains
-
 
 
     //Parallel tempering
-    for (int i=0; i<maxint ; i++){
-
-        if (it % (itmax / 10) == 0) {
-            std::cout << std::setw(3) << (100 * it / itmax) << "% done" << std::endl;
-        }
-
-        //add CPU
-        for (int ichain=0; ichain<PT.nchains ; ichain++){
-            Param Mnew = P[ichain];
-            Mnew.k_a_sigma   += unif_dist(gen) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigma;
-            Mnew.b_a         += unif_dist(gen) * (PT.b_a_sup         - PT.b_a_inf) * sigma ;
-            Mnew.D_c_inv     += unif_dist(gen) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma ;
-            Mnew.Dtau_asigma += unif_dist(gen) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigma;
-
-            bool accept = false ;
-
-            if (Mnew.k_a_sigma   < PT.k_a_sigma_inf   || Mnew.k_a_sigma   > PT.k_a_sigma_sup   ||
-            Mnew.b_a         < PT.b_a_inf         || Mnew.b_a         > PT.b_a_sup         ||
-            Mnew.D_c_inv     < PT.D_c_inv_inf     || Mnew.D_c_inv     > PT.D_c_inv_sup     ||
-            Mnew.Dtau_asigma < PT.Dtau_asigma_inf || Mnew.Dtau_asigma > PT.Dtau_asigma_sup) 
-            {
-                int ret = compute_llk(const Param *P)
-                //résoudre + llk
-                if (!std::isnan(Enew))
+    #pragma omp parallel 
+    {
+    ThreadWorkspace& work = workspaces[omp_get_thread_num()];
 
 
+    for (int it = 0; it < maxint ; it ++ ){
+
+        #pragma omp single
+        {
+        if (it % (maxint / 10) == 0) {
+            std::cout << std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+        }}
+
+        #pragma omp for
+        for (int ichain = 0; ichain < PT.nchains ; ichain++){
+
+            //copy model values
+            work.pP.assign(M.begin() + (ichain * NSubFaults), M.begin() + ((ichain + 1) * NSubFaults));
+
+            //New model proposal
+            for (int i=0; i<NSubFaults; i++){
+                work.pP[i].k_a_sigma   += unif_dist(gen) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigma;
+                work.pP[i].b_a         += unif_dist(gen) * (PT.b_a_sup         - PT.b_a_inf) * sigma ;
+                work.pP[i].D_c_inv     += unif_dist(gen) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma ;
+                work.pP[i].Dtau_asigma += unif_dist(gen) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigma;
             }
 
-            Mnew = Param(Mnew.k_a_sigma, Mnew.b_a, Mnew.D_c_inv, Mnew.Dtau_asigma);
+            // Check if out of bounds
+            bool InBound = true;
+            for (int i=0; i<NSubFaults; i++){
+                if (work.pP[i].k_a_sigma   < PT.k_a_sigma_inf   || work.pP[i].k_a_sigma   > PT.k_a_sigma_sup   ||
+                    work.pP[i].b_a         < PT.b_a_inf         || work.pP[i].b_a         > PT.b_a_sup         ||
+                    work.pP[i].D_c_inv     < PT.D_c_inv_inf     || work.pP[i].D_c_inv     > PT.D_c_inv_sup     ||
+                    work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf || work.pP[i].Dtau_asigma > PT.Dtau_asigma_sup) 
+                {
+                    InBound = false;
+                    break; 
+                }
+                }
 
+            //accept rate of the new model
+            bool accept = false ;
+
+            if (InBound) {
+                double Enew = compute_llk(t_list, data, G , work);
+                if (!std::isnan(Enew)){
+                    double delta  = (Enew - llk[ichain])/T[ichain] ;
+                    double alpha  = min(0.0, delta);
+                    double u      = std::log(unif_dist(gen) );
+                    accept = (u <= alpha);
+                }
+            }
+
+            if (accept){
+                std::copy(work.pP.begin(), work.pP.end(), M.begin() + (ichain * NSubFaults));
+                llk[ichain] = Enew;
+                if (ichain<PT.ncold) save_step(work.pP, Enew);            //plus tard save que sur certaines itérations
+            }
+
+        }} //parallel end
+
+        #pragma omp single
+        {
+        for (int s = 0; s < PT.nchains - 1; s++) {
+            int p = irand(0, PT.nchains - 1); // Sélection aléatoire d'une chaîne p
+            int q = irand(0, PT.nchains - 1); // Sélection aléatoire d'une chaîne q
+            if (p == q) continue;
+
+            // Formule théorique du Parallel Tempering
+            double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+            double u_swap     = std::log(unif_dist(gen));
+
+            if (u_swap <= alpha_swap) {
+                // Échange des blocs physiques correspondants dans le vecteur plat M
+                std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
+                // Échange des log-vraisemblances correspondantes
+                std::swap(llk[p], llk[q]);
+            }
+        }
+        //do the swap
+        //choose randomly 2 int in 0:nchains folowing the acceptance rule u<alpha
+        /*
+        alpha = min(0.0, (1.0/T[p]-1.0/T[q])*(E[q]-E[p]))
+        u     = np.log(np.random.uniform(0.0, 1.0))
 
         }
+        */
+       //swap the models (copy models and put to corresponding part of M)
+       //update corresponding pP
 
         
     }
-
-
-
     
     return 0;
 }

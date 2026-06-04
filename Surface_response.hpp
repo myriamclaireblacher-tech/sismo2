@@ -6,8 +6,8 @@
 
 
 
-/*
-int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,  
+
+int surface_response_parallel(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,  
                         std::vector<Fault>& fault_per_thread,
                         Eigen::Matrix<double,3*Nstations,NSubFaults>& G, 
                         Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix, 
@@ -28,8 +28,8 @@ int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,
     RES_matrix.noalias() = G * storage_matrix ;
         
    return 0;       
-}
-   */
+};
+   
 
 int surface_response(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,  
                         std::vector<Fault>& fault_per_thread,
