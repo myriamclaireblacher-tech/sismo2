@@ -7,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 struct PT_param {
     double k_a_sigma_inf;           // k/ (a sigma) lower bound
@@ -30,13 +31,12 @@ struct PT_param {
 
 struct ThreadWorkspace {
     std::vector<Param> pP;
-    std::vector<Fault> Faults;
-    Eigen::MatrixXd RES_matrix;
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> storage_matrix;
+    Fault fault;
+    Eigen::Matrix<double, 6, Eigen::Dynamic> RES_matrix;
+    Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> storage_matrix;
 
     ThreadWorkspace(int t_list_size) {
         pP.resize(NSubFaults);
-        Faults.resize(NSubFaults);
         RES_matrix.resize(3 * Nstations, t_list_size);
         storage_matrix.resize(NSubFaults, t_list_size);
     }
@@ -59,7 +59,7 @@ struct ColdChainSaver {
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
-    int SR = surface_response(work.pP, t_list, work.Faults, G, work.RES_matrix, work.storage_matrix);
+    int SR = surface_response(work.pP, t_list, work.fault, G, work.RES_matrix, work.storage_matrix);
     if (SR!=0) return -std::numeric_limits<double>::infinity();
     double llk = - (data - work.RES_matrix).array().square().sum();
     return llk;
@@ -68,7 +68,7 @@ double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<
 
 
 
-int parallel_tempering(const int maxint, const PT_param PT, 
+int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
                     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype>& t_list,  int seed=42, double sigma=0.05){
 
     //check t_list size, data size
@@ -98,6 +98,9 @@ int parallel_tempering(const int maxint, const PT_param PT,
 
     }
 
+    //random integer 
+    std::uniform_int_distribution<int> rand_chain(0, PT.nchains - 2); 
+
     //likelihood data storage
     std::vector<double> llk ;
     llk.resize(PT.nchains);
@@ -108,6 +111,7 @@ int parallel_tempering(const int maxint, const PT_param PT,
     #pragma omp parallel 
     {
         ThreadWorkspace& work = workspaces[omp_get_thread_num()]; 
+        std::mt19937 gen2(seed+omp_get_thread_num());
 
         #pragma omp for schedule(dynamic)
         for (int i=0;i<PT.nchains*NSubFaults;i++){
@@ -127,14 +131,10 @@ int parallel_tempering(const int maxint, const PT_param PT,
             if (i<PT.ncold) savers[i].save_step(work.pP, llk_i);
             llk[i]=llk_i;
         }
-    }
+    
 
 
     //Parallel tempering
-    #pragma omp parallel 
-    {
-    ThreadWorkspace& work = workspaces[omp_get_thread_num()];
-    std::mt19937 gen2(seed+omp_get_thread_num());
 
 
     for (int it = 0; it < maxint ; it ++ ){
@@ -174,9 +174,10 @@ int parallel_tempering(const int maxint, const PT_param PT,
 
             //accept rate of the new model
             bool accept = false ;
+            double Enew = -std::numeric_limits<double>::infinity() ; 
 
             if (InBound) {
-                double Enew = compute_llk(t_list, data, G , work);
+                Enew = compute_llk(t_list, data, G , work);
                 if (Enew!=-std::numeric_limits<double>::infinity()){
                     double delta  = (Enew - llk[ichain])/T[ichain] ;
                     double alpha  = std::min(0.0, delta);
@@ -195,9 +196,12 @@ int parallel_tempering(const int maxint, const PT_param PT,
 
         #pragma omp single
         {
+
+        
+
         for (int s = 0; s < PT.nchains - 1; s++) {
-            int p = irand(0, PT.nchains - 1); 
-            int q = irand(0, PT.nchains - 1); 
+            int p = rand_chain(gen);
+            int q = rand_chain(gen);
             if (p == q) continue;
 
             // Formule théorique du Parallel Tempering

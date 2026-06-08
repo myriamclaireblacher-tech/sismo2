@@ -33,6 +33,7 @@ class Param{
         coeff1( 2.0 * (-k_a_sigma_enter + b_a_enter * D_c_inv_enter) ), coeff2(Vinf * k_a_sigma_enter  )
         {}
 
+        Param() = default ;
 };
 
 #endif

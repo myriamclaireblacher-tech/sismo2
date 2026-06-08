@@ -2,6 +2,6 @@
 #include <chrono>
 
 int main() {
-    cout<<"hello";
+    std::cout<<"hello";
     return 0;
 }
