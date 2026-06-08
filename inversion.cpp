@@ -37,10 +37,10 @@ double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<
 }
 
 int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
-                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype>& t_list,  int seed=42, double sigma=0.05){
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype>& t_list,  int seed, double sigma){
 
     //check t_list size, data size
-    if (t_list.size()!=data.size()) std::cout<<"\nt_list and data size are not matching \n";
+    if (t_list.size()!=(data.size()/3/Nstations)) std::cout<<"\nt_list and data size are not matching \n";
 
     //Create storage space for each CPU
     std::vector<ThreadWorkspace> workspaces;
@@ -73,7 +73,7 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
     std::vector<double> llk ;
     llk.resize(PT.nchains);
 
-    //Initial models of the chains
+    //Initial models of the chains    
     std::vector<Param> M;
     M.resize(PT.nchains*NSubFaults);
     #pragma omp parallel 
@@ -82,24 +82,31 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
         std::mt19937 gen2(seed+omp_get_thread_num());
 
         #pragma omp for schedule(dynamic)
-        for (int i=0;i<PT.nchains*NSubFaults;i++){
-            double p1 = PT.k_a_sigma_inf + unif_dist(gen2) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
-            double p2 = PT.b_a_inf +     unif_dist(gen2) * (PT.b_a_sup - PT.b_a_inf );
-            double p3 = PT.D_c_inv_inf + unif_dist(gen2) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
-            double p4 = PT.Dtau_asigma_inf + unif_dist(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
-            M[i]=Param(p1, p2, p3, p4);
-        }
+        for (int j=0;j<PT.nchains;j++){
+            bool reject = true;
+            double llk_i ;
+            //propose new model 
+            while (reject)
+            {
 
-        //save initial models in files for cold chains
-        #pragma omp for
-        for (int i=0;i<PT.ncold;i++){
-            work.pP.assign(M.begin() + (i * NSubFaults), 
-                           M.begin() + ((i + 1) * NSubFaults));
-            double llk_i = compute_llk(t_list, data, G , work);
-            if (i<PT.ncold) savers[i].save_step(work.pP, llk_i);
-            llk[i]=llk_i;
+            for (int i=0; i<NSubFaults ; i++){
+                double p1 = PT.k_a_sigma_inf + unif_dist(gen2) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
+                double p2 = PT.b_a_inf +     unif_dist(gen2) * (PT.b_a_sup - PT.b_a_inf );
+                double p3 = PT.D_c_inv_inf + unif_dist(gen2) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
+                double p4 = PT.Dtau_asigma_inf + unif_dist(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
+                M[j * NSubFaults + i]=Param(p1, p2, p3, p4);
+            }
+
+            //test llk
+            work.pP.assign(M.begin() + (j * NSubFaults), 
+                           M.begin() + ((j + 1) * NSubFaults));
+            llk_i = compute_llk(t_list, data, G , work);
+            if (llk_i != -std::numeric_limits<double>::infinity() ) reject = false ;
+            }
+            llk[j]=llk_i;
+            if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
+
         }
-    
 
 
     //Parallel tempering
@@ -163,7 +170,7 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
         }} //parallel end
 
         #pragma omp single
-        {
+        { std::cout<<"\nswap ";
 
         
 

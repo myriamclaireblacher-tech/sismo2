@@ -1,4 +1,3 @@
-
 #écrit par une ia j'avais trop la flemme
 #modify here
 #terminal must be in the file of file_name
@@ -44,27 +43,37 @@ plt.show()
 # Chargement des données du fichier CSV
 df = pd.read_csv("surface_responses.csv")
 
-# Configuration de la figure (2 sous-graphiques pour séparer les stations)
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+# Configuration de la figure (3 sous-graphiques : 1 par composante)
+fig, (ax_north, ax_east, ax_depth) = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
 
-# Tracé pour la Station 1
-ax1.plot(df["Time"], df["St1_North"], label="Nord", color="darkred")
-ax1.plot(df["Time"], df["St1_East"], label="Est", color="darkgreen")
-ax1.plot(df["Time"], df["St1_Depth"], label="Profondeur", color="darkblue")
-ax1.set_ylabel("Déplacement (cm)")
-ax1.set_title("Station 1")
-ax1.grid(True, linestyle=":", alpha=0.6)
-ax1.legend()
+# Définition des couleurs : 1 par station
+color_st1 = "blue"
+color_st2 = "orange"
 
-# Tracé pour la Station 2
-ax2.plot(df["Time"], df["St2_North"], label="Nord", color="crimson", linestyle="--")
-ax2.plot(df["Time"], df["St2_East"], label="Est", color="forestgreen", linestyle="--")
-ax2.plot(df["Time"], df["St2_Depth"], label="Profondeur", color="royalblue", linestyle="--")
-ax2.set_xlabel("Temps (h)")
-ax2.set_ylabel("Déplacement (cm)")
-ax2.set_title("Station 2")
-ax2.grid(True, linestyle=":", alpha=0.6)
-ax2.legend()
+# 1. Sous-graphique NORD
+ax_north.plot(df["Time"], df["St1_North"], label="Station 1", color=color_st1, linewidth=1.5)
+ax_north.plot(df["Time"], df["St2_North"], label="Station 2", color=color_st2, linewidth=1.5)
+ax_north.set_ylabel("Déplacement (cm)")
+ax_north.set_title("Composante Nord")
+ax_north.grid(True, linestyle=":", alpha=0.6)
+ax_north.legend()
+
+# 2. Sous-graphique EST
+ax_east.plot(df["Time"], df["St1_East"], label="Station 1", color=color_st1, linewidth=1.5)
+ax_east.plot(df["Time"], df["St2_East"], label="Station 2", color=color_st2, linewidth=1.5)
+ax_east.set_ylabel("Déplacement (cm)")
+ax_east.set_title("Composante Est")
+ax_east.grid(True, linestyle=":", alpha=0.6)
+ax_east.legend()
+
+# 3. Sous-graphique PROFONDEUR / VERTICAL
+ax_depth.plot(df["Time"], df["St1_Depth"], label="Station 1", color=color_st1, linewidth=1.5)
+ax_depth.plot(df["Time"], df["St2_Depth"], label="Station 2", color=color_st2, linewidth=1.5)
+ax_depth.set_xlabel("Temps (h)")
+ax_depth.set_ylabel("Déplacement (cm)")
+ax_depth.set_title("Composante Profondeur (Vertical)")
+ax_depth.grid(True, linestyle=":", alpha=0.6)
+ax_depth.legend()
 
 plt.tight_layout()
 plt.show()

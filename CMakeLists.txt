@@ -21,6 +21,7 @@ find_package(OpenMP REQUIRED)
 set(SOURCES
     main.cpp
     ODE.cpp
+    inversion.cpp
 )
 
 set(HEADERS
@@ -28,6 +29,7 @@ set(HEADERS
     variables.hpp
     param.hpp
     Surface_response.hpp
+    inversion.hpp
 )
 
 # 3. RECHERCHE DE SUNDIALS

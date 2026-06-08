@@ -5,7 +5,7 @@
 #include <omp.h>
 
 
-
+/*
 
 int surface_response_parallel(std::vector<Param>& pP, std::vector<sunrealtype>& t_list,  
                         std::vector<Fault>& fault_per_thread,
@@ -30,8 +30,9 @@ int surface_response_parallel(std::vector<Param>& pP, std::vector<sunrealtype>& 
    return 0;       
 };
    
+*/
 
-int surface_response(std::vector<Param>& pP, const std::vector<sunrealtype>& t_list,  
+inline int surface_response(std::vector<Param>& pP, const std::vector<sunrealtype>& t_list,  
                         Fault & fault,
                         Eigen::Matrix<double,3*Nstations,NSubFaults>& G, 
                         Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix, 

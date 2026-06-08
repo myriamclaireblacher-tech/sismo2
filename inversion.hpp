@@ -5,7 +5,6 @@
 #include <random>
 #include <cmath>
 #include <string>
-#include <fstream>
 #include <iostream>
 #include <iomanip>
 
@@ -43,8 +42,6 @@ struct ColdChainSaver {
 
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
-
-
 
 
 int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
