@@ -253,7 +253,7 @@ int check_retval(void* returnvalue, const char* funcname, int opt)
     retval = (int*)returnvalue;
     if (*retval < 0)
     {
-      fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n",
+      if (rapport_EDO==true) fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n",
               funcname, *retval);
       return (1);
     }

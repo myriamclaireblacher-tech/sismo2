@@ -72,8 +72,7 @@ int main() {
     -----------------------------------------------------------------------------------------------------------------------
     */
 
-    std::cout<<"compute surface displacement : ";
-    auto timeStart = std::chrono::high_resolution_clock::now();
+    
     
     for (int i=0; i<NSubFaults ; i++){
             pP.emplace_back(0.01+0.001*i, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
@@ -86,10 +85,7 @@ int main() {
     
     
 
-    auto timeEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = timeEnd - timeStart;
-    double timeTotal = duration.count();
-    std::cout<<timeTotal;
+
     /*
     -------------------------------------------------------------------------------------------------------------------
                     EXPORT DATA FOR VIZUALISATION
@@ -162,9 +158,15 @@ int main() {
 
     std::cout<<"\n begin parallel tempering : " ; 
 
-    int hey = parallel_tempering_test_out_of_bounds(2000, ParametersPT, G, RES_matrix, t_list) ;
+    std::cout<<"compute surface displacement : ";
+    auto timeStart = std::chrono::high_resolution_clock::now();
 
-    std::cout<<"\nTEST : "<<hey;
+    parallel_tempering_test_out_of_bounds(100000, ParametersPT, G, RES_matrix, t_list) ;
+
+    auto timeEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = timeEnd - timeStart;
+    double timeTotal = duration.count();
+    std::cout<<"temps total : "<<timeTotal;
 
     return 0;
 
