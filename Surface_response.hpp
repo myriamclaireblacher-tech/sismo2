@@ -34,7 +34,7 @@ int surface_response_parallel(std::vector<Param>& pP, std::vector<sunrealtype>& 
 
 inline int surface_response(std::vector<Param>& pP, const std::vector<sunrealtype>& t_list,  
                         Fault & fault,
-                        Eigen::Matrix<double,3*Nstations,NSubFaults>& G, 
+                        const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, 
                         Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix, 
                         Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
         

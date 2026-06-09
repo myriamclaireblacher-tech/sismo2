@@ -28,7 +28,7 @@ void ColdChainSaver::save_step(const std::vector<Param>& pP, double energy) {
 }
 
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
-                    Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
     int SR = surface_response(work.pP, t_list, work.fault, G, work.RES_matrix, work.storage_matrix);
     if (SR!=0) return -std::numeric_limits<double>::infinity();
@@ -36,17 +36,16 @@ double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<
     return llk;
 }
 
-int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
-                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype>& t_list,  int seed, double sigma){
+int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed,const double sigma){
 
     //check t_list size, data size
-    if (t_list.size()!=(data.size()/3/Nstations)) std::cout<<"\nt_list and data size are not matching \n";
+    if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
 
     //Create storage space for each CPU
-    std::vector<ThreadWorkspace> workspaces;
-    workspaces.reserve(NCPU);
+    std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
     for (int t = 0; t < NCPU; ++t) {
-        workspaces.emplace_back(t_list.size());
+        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
     }
 
     //storage of the models of the cold chains
@@ -78,9 +77,12 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
     M.resize(PT.nchains*NSubFaults);
     #pragma omp parallel 
     {
-        ThreadWorkspace& work = workspaces[omp_get_thread_num()]; 
+        ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
         std::mt19937 gen2(seed+omp_get_thread_num());
+        /////////////////////////////////
+        const std::string BLUE    = "\033[34m";
 
+        /*
         #pragma omp for schedule(dynamic)
         for (int j=0;j<PT.nchains;j++){
             bool reject = true;
@@ -101,12 +103,46 @@ int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double
             work.pP.assign(M.begin() + (j * NSubFaults), 
                            M.begin() + ((j + 1) * NSubFaults));
             llk_i = compute_llk(t_list, data, G , work);
-            if (llk_i != -std::numeric_limits<double>::infinity() ) reject = false ;
+            if (llk_i != -std::numeric_limits<double>::infinity() ) {reject = false;}
             }
             llk[j]=llk_i;
             if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
 
         }
+        */
+
+        #pragma omp for schedule(dynamic)
+        for (int j=0;j<PT.nchains;j++){
+            bool reject = true;
+            double llk_i ;
+            //propose new model 
+            while (reject)
+            {
+            for (int i = 0; i < NSubFaults; i++) {
+                // Centre exact des bornes
+                double p1 = (PT.k_a_sigma_inf + PT.k_a_sigma_sup) / 2.0;
+                double p2 = (PT.b_a_inf + PT.b_a_sup) / 2.0;
+                double p3 = (PT.D_c_inv_inf + PT.D_c_inv_sup) / 2.0;
+                double p4 = (PT.Dtau_asigma_inf + PT.Dtau_asigma_sup) / 2.0;
+
+                // On applique une infime variation de 1% maximum propre à chaque chaîne (j) et sous-faille (i)
+                // pour que les 10 chaînes ne partent pas exactement du même pixel
+                double bruit = 0.99 + 0.02 * unif_dist(gen2); // Nombre entre 0.99 et 1.01
+
+                M[j * NSubFaults + i] = Param(p1 * bruit, p2 * bruit, p3 * bruit, p4 * bruit);
+            }
+
+            //test llk
+            work.pP.assign(M.begin() + (j * NSubFaults), 
+                           M.begin() + ((j + 1) * NSubFaults));
+            llk_i = compute_llk(t_list, data, G , work);
+            if (llk_i != -std::numeric_limits<double>::infinity() ) {reject = false;}
+            }
+            llk[j]=llk_i;
+            if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
+
+        }
+        
 
 
     //Parallel tempering

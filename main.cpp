@@ -38,9 +38,10 @@ int main() {
     */
     
     std::cout<<"define data storage : ";
-    const int nb_threads = omp_get_max_threads();
+    //const int nb_threads = omp_get_max_threads();
+    const int nb_threads = NCPU ;
     
-    //omp_set_num_threads(1);
+    omp_set_num_threads(NCPU);
     //int nb_threads=1;
     
     std::cout<<"\nnb_threads : "<<nb_threads<<"\n";
@@ -161,7 +162,7 @@ int main() {
 
     std::cout<<"\n begin parallel tempering : " ; 
 
-    int hey = parallel_tempering(50, ParametersPT, G, RES_matrix, t_list) ;
+    int hey = parallel_tempering(1000000, ParametersPT, G, RES_matrix, t_list) ;
 
     std::cout<<"\nTEST : "<<hey;
 

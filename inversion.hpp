@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <memory>
 
 struct PT_param {
     double k_a_sigma_inf;           // k/ (a sigma) lower bound
@@ -41,10 +42,10 @@ struct ColdChainSaver {
 };
 
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
-                    Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
 
 
-int parallel_tempering(const int maxint, const PT_param PT, Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
-                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype>& t_list,  int seed=42, double sigma=0.05);
+int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
 
 #endif

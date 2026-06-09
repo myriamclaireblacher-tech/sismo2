@@ -12,5 +12,6 @@ constexpr int NSubFaults = 450 ;
 //constexpr int NSubFaults = 1 ;
 
 constexpr int NCPU = 6 ;
+                    //6
 
 #endif
