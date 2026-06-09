@@ -162,7 +162,7 @@ int main() {
 
     std::cout<<"\n begin parallel tempering : " ; 
 
-    int hey = parallel_tempering(1000000, ParametersPT, G, RES_matrix, t_list) ;
+    int hey = parallel_tempering_test_out_of_bounds(2000, ParametersPT, G, RES_matrix, t_list) ;
 
     std::cout<<"\nTEST : "<<hey;
 

@@ -79,37 +79,10 @@ int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<
     {
         ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
         std::mt19937 gen2(seed+omp_get_thread_num());
+        std::uniform_real_distribution<double> unif_dist_plus(-1.0 , 1.0);//////////////////////////////////////
         /////////////////////////////////
-        const std::string BLUE    = "\033[34m";
+        std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0); ///////////////////////
 
-        /*
-        #pragma omp for schedule(dynamic)
-        for (int j=0;j<PT.nchains;j++){
-            bool reject = true;
-            double llk_i ;
-            //propose new model 
-            while (reject)
-            {
-
-            for (int i=0; i<NSubFaults ; i++){
-                double p1 = PT.k_a_sigma_inf + unif_dist(gen2) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
-                double p2 = PT.b_a_inf +     unif_dist(gen2) * (PT.b_a_sup - PT.b_a_inf );
-                double p3 = PT.D_c_inv_inf + unif_dist(gen2) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
-                double p4 = PT.Dtau_asigma_inf + unif_dist(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
-                M[j * NSubFaults + i]=Param(p1, p2, p3, p4);
-            }
-
-            //test llk
-            work.pP.assign(M.begin() + (j * NSubFaults), 
-                           M.begin() + ((j + 1) * NSubFaults));
-            llk_i = compute_llk(t_list, data, G , work);
-            if (llk_i != -std::numeric_limits<double>::infinity() ) {reject = false;}
-            }
-            llk[j]=llk_i;
-            if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
-
-        }
-        */
 
         #pragma omp for schedule(dynamic)
         for (int j=0;j<PT.nchains;j++){
@@ -127,9 +100,169 @@ int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<
 
                 // On applique une infime variation de 1% maximum propre à chaque chaîne (j) et sous-faille (i)
                 // pour que les 10 chaînes ne partent pas exactement du même pixel
-                double bruit = 0.99 + 0.02 * unif_dist(gen2); // Nombre entre 0.99 et 1.01
+                double bruit = 0.99 + 0.02 * unif_dist_intern(gen2); // Nombre entre 0.99 et 1.01
 
                 M[j * NSubFaults + i] = Param(p1 * bruit, p2 * bruit, p3 * bruit, p4 * bruit);
+            }
+
+            //test llk
+            work.pP.assign(M.begin() + (j * NSubFaults), 
+                           M.begin() + ((j + 1) * NSubFaults));
+            llk_i = compute_llk(t_list, data, G , work);
+            if (llk_i != -std::numeric_limits<double>::infinity() ) {reject = false;}
+            }
+            llk[j]=llk_i;
+            if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
+
+        }
+        
+
+
+    //Parallel tempering
+
+
+    for (int it = 0; it < maxint ; it ++ ){
+
+        #pragma omp single
+        {
+        if (it % (maxint / 10) == 0) {
+            std::cout << std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+        }}
+
+        #pragma omp for schedule(dynamic)
+        for (int ichain = 0; ichain < PT.nchains ; ichain++){
+
+            //copy model values
+            work.pP.assign(M.begin() + (ichain * NSubFaults), M.begin() + ((ichain + 1) * NSubFaults));
+
+            //New model proposal
+            for (int i=0; i<NSubFaults; i++){
+                work.pP[i].k_a_sigma   += unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigma;
+                work.pP[i].b_a         += unif_dist_plus(gen2) * (PT.b_a_sup         - PT.b_a_inf) * sigma ;
+                work.pP[i].D_c_inv     += unif_dist_plus(gen2) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma ;
+                work.pP[i].Dtau_asigma += unif_dist_plus(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigma;
+            }
+
+            // Check if out of bounds
+            bool InBound = true;
+            for (int i=0; i<NSubFaults; i++){
+                if (work.pP[i].k_a_sigma   < PT.k_a_sigma_inf   || work.pP[i].k_a_sigma   > PT.k_a_sigma_sup   ||
+                    work.pP[i].b_a         < PT.b_a_inf         || work.pP[i].b_a         > PT.b_a_sup         ||
+                    work.pP[i].D_c_inv     < PT.D_c_inv_inf     || work.pP[i].D_c_inv     > PT.D_c_inv_sup     ||
+                    work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf || work.pP[i].Dtau_asigma > PT.Dtau_asigma_sup) 
+                {
+                    InBound = false;
+                    break; 
+                }
+                }
+            #pragma omp atomic
+            //accept rate of the new model
+            bool accept = false ;
+            double Enew = -std::numeric_limits<double>::infinity() ; 
+
+            if (InBound) {
+                Enew = compute_llk(t_list, data, G , work);
+                if (Enew!=-std::numeric_limits<double>::infinity()){
+                    double delta  = (Enew - llk[ichain])/T[ichain] ;
+                    double alpha  = std::min(0.0, delta);
+                    double u      = std::log(unif_dist_intern(gen2) );
+                    accept = (u <= alpha);
+                }
+            }
+
+            if (accept){
+                std::copy(work.pP.begin(), work.pP.end(), M.begin() + (ichain * NSubFaults));
+                llk[ichain] = Enew;
+                if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);            //plus tard save que sur certaines itérations
+            }
+
+        } //parallel end
+
+        #pragma omp single
+        { 
+        for (int s = 0; s < PT.nchains - 1; s++) {
+            int p = rand_chain(gen);
+            int q = rand_chain(gen);
+            if (p == q) continue;
+
+            // Formule théorique du Parallel Tempering
+            double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+            double u_swap     = std::log(unif_dist(gen));
+
+            if (u_swap <= alpha_swap) {
+                std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
+                std::swap(llk[p], llk[q]);
+            }
+        }
+        
+    }}}
+    std::cout<<"\n 100% done \n results ( log likelihood + models ) are saved in model_parameters.csv";
+    return 0;
+}
+
+//à corriger, conditions initiales
+
+int parallel_tempering_random_initial(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed,const double sigma){
+
+    //check t_list size, data size
+    if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
+
+    //Create storage space for each CPU
+    std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
+    for (int t = 0; t < NCPU; ++t) {
+        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+    }
+
+    //storage of the models of the cold chains
+    std::vector<ColdChainSaver> savers;
+    for (int i = 0; i < PT.ncold; ++i) {
+        savers.emplace_back(i);
+    }
+    
+    //Temperatures of the chains
+    std::mt19937 gen(seed); //generate random
+    std::vector<double> T(PT.nchains); 
+    std::uniform_real_distribution<double> unif_dist(0.0 , 1.0);
+
+    for (int i=0;i<PT.nchains;i++){
+        if (i<PT.ncold) T[i]=1.0 ;
+        else T[i]= std :: exp( unif_dist(gen) * std::log(PT.T_max) ) ; //loguniform repartition
+
+    }
+
+    //random integer 
+    std::uniform_int_distribution<int> rand_chain(0, PT.nchains - 2); 
+
+    //likelihood data storage
+    std::vector<double> llk ;
+    llk.resize(PT.nchains);
+
+    //Initial models of the chains    
+    std::vector<Param> M;
+    M.resize(PT.nchains*NSubFaults);
+    #pragma omp parallel 
+    {
+        ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
+        std::mt19937 gen2(seed+omp_get_thread_num());
+        /////////////////////////////////
+        const std::string BLUE    = "\033[34m";
+
+        
+        #pragma omp for schedule(dynamic)
+        for (int j=0;j<PT.nchains;j++){
+            bool reject = true;
+            double llk_i ;
+            //propose new model 
+            while (reject)
+            {
+
+            for (int i=0; i<NSubFaults ; i++){
+                double p1 = PT.k_a_sigma_inf + unif_dist(gen2) * (PT.k_a_sigma_sup - PT.k_a_sigma_inf );
+                double p2 = PT.b_a_inf +     unif_dist(gen2) * (PT.b_a_sup - PT.b_a_inf );
+                double p3 = PT.D_c_inv_inf + unif_dist(gen2) * (PT.D_c_inv_sup - PT.D_c_inv_inf );
+                double p4 = PT.Dtau_asigma_inf + unif_dist(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf ) ;
+                M[j * NSubFaults + i]=Param(p1, p2, p3, p4);
             }
 
             //test llk
@@ -203,13 +336,10 @@ int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<
                 if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);            //plus tard save que sur certaines itérations
             }
 
-        }} //parallel end
+        } //parallel end
 
         #pragma omp single
-        { std::cout<<"\nswap ";
-
-        
-
+        { 
         for (int s = 0; s < PT.nchains - 1; s++) {
             int p = rand_chain(gen);
             int q = rand_chain(gen);
@@ -225,8 +355,181 @@ int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<
             }
         }
         
-    }}
-    std::cout<<"\n 100% done";
+    }}}
+    std::cout<<"\n 100% done \n results ( log likelihood + models ) are saved in model_parameters.csv";
     return 0;
 }
+
+
+int parallel_tempering_test_out_of_bounds(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed,const double sigma){
+
+    int inbouds=0 ;
+    //check t_list size, data size
+    if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
+
+    //Create storage space for each CPU
+    std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
+    for (int t = 0; t < NCPU; ++t) {
+        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+    }
+
+    //storage of the models of the cold chains
+    std::vector<ColdChainSaver> savers;
+    for (int i = 0; i < PT.ncold; ++i) {
+        savers.emplace_back(i);
+    }
+    
+    //Temperatures of the chains
+    std::mt19937 gen(seed); //generate random
+    std::vector<double> T(PT.nchains); 
+    std::uniform_real_distribution<double> unif_dist(0.0 , 1.0);
+
+    for (int i=0;i<PT.nchains;i++){
+        if (i<PT.ncold) T[i]=1.0 ;
+        else T[i]= std :: exp( unif_dist(gen) * std::log(PT.T_max) ) ; //loguniform repartition
+
+    }
+
+    //random integer 
+    std::uniform_int_distribution<int> rand_chain(0, PT.nchains - 2); 
+
+    //likelihood data storage
+    std::vector<double> llk ;
+    llk.resize(PT.nchains);
+
+    //Initial models of the chains    
+    std::vector<Param> M;
+    M.resize(PT.nchains*NSubFaults);
+    #pragma omp parallel 
+    {
+        ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
+        std::mt19937 gen2(seed+omp_get_thread_num());
+        std::uniform_real_distribution<double> unif_dist_plus(-1.0 , 1.0);//////////////////////////////////////
+        /////////////////////////////////
+        std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0); ///////////////////////
+
+
+        #pragma omp for schedule(dynamic)
+        for (int j=0;j<PT.nchains;j++){
+            bool reject = true;
+            double llk_i ;
+            //propose new model 
+            while (reject)
+            {
+            for (int i = 0; i < NSubFaults; i++) {
+                // Centre exact des bornes
+                double p1 = (PT.k_a_sigma_inf + PT.k_a_sigma_sup) / 2.0;
+                double p2 = (PT.b_a_inf + PT.b_a_sup) / 2.0;
+                double p3 = (PT.D_c_inv_inf + PT.D_c_inv_sup) / 2.0;
+                double p4 = (PT.Dtau_asigma_inf + PT.Dtau_asigma_sup) / 2.0;
+
+                // On applique une infime variation de 1% maximum propre à chaque chaîne (j) et sous-faille (i)
+                // pour que les 10 chaînes ne partent pas exactement du même pixel
+                double bruit = 0.99 + 0.02 * unif_dist_intern(gen2); // Nombre entre 0.99 et 1.01
+
+                M[j * NSubFaults + i] = Param(p1 * bruit, p2 * bruit, p3 * bruit, p4 * bruit);
+            }
+
+            //test llk
+            work.pP.assign(M.begin() + (j * NSubFaults), 
+                           M.begin() + ((j + 1) * NSubFaults));
+            llk_i = compute_llk(t_list, data, G , work);
+            if (llk_i != -std::numeric_limits<double>::infinity() ) {reject = false;}
+            }
+            llk[j]=llk_i;
+            if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
+
+        }
+        
+
+
+    //Parallel tempering
+
+
+    for (int it = 0; it < maxint ; it ++ ){
+
+        #pragma omp single
+        {
+        if (it % (maxint / 10) == 0) {
+            std::cout << std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+        }}
+
+        #pragma omp for schedule(dynamic)
+        for (int ichain = 0; ichain < PT.nchains ; ichain++){
+
+            //copy model values
+            work.pP.assign(M.begin() + (ichain * NSubFaults), M.begin() + ((ichain + 1) * NSubFaults));
+
+            //New model proposal
+            for (int i=0; i<NSubFaults; i++){
+                work.pP[i].k_a_sigma   += unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigma;
+                work.pP[i].b_a         += unif_dist_plus(gen2) * (PT.b_a_sup         - PT.b_a_inf) * sigma ;
+                work.pP[i].D_c_inv     += unif_dist_plus(gen2) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma ;
+                work.pP[i].Dtau_asigma += unif_dist_plus(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigma;
+            }
+
+            // Check if out of bounds
+            bool InBound = true;
+            for (int i=0; i<NSubFaults; i++){
+                if (work.pP[i].k_a_sigma   < PT.k_a_sigma_inf   || work.pP[i].k_a_sigma   > PT.k_a_sigma_sup   ||
+                    work.pP[i].b_a         < PT.b_a_inf         || work.pP[i].b_a         > PT.b_a_sup         ||
+                    work.pP[i].D_c_inv     < PT.D_c_inv_inf     || work.pP[i].D_c_inv     > PT.D_c_inv_sup     ||
+                    work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf || work.pP[i].Dtau_asigma > PT.Dtau_asigma_sup) 
+                {
+                    InBound = false;
+                    break; 
+                }
+                }
+            #pragma omp atomic
+            inbouds+=InBound;
+            //accept rate of the new model
+            bool accept = false ;
+            double Enew = -std::numeric_limits<double>::infinity() ; 
+
+            if (InBound) {
+                Enew = compute_llk(t_list, data, G , work);
+                if (Enew!=-std::numeric_limits<double>::infinity()){
+                    double delta  = (Enew - llk[ichain])/T[ichain] ;
+                    double alpha  = std::min(0.0, delta);
+                    double u      = std::log(unif_dist_intern(gen2) );
+                    accept = (u <= alpha);
+                }
+            }
+
+            if (accept){
+                std::copy(work.pP.begin(), work.pP.end(), M.begin() + (ichain * NSubFaults));
+                llk[ichain] = Enew;
+                if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);            //plus tard save que sur certaines itérations
+            }
+
+        } //parallel end
+
+        #pragma omp single
+        { 
+        for (int s = 0; s < PT.nchains - 1; s++) {
+            int p = rand_chain(gen);
+            int q = rand_chain(gen);
+            if (p == q) continue;
+
+            // Formule théorique du Parallel Tempering
+            double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+            double u_swap     = std::log(unif_dist(gen));
+
+            if (u_swap <= alpha_swap) {
+                std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
+                std::swap(llk[p], llk[q]);
+            }
+        }
+        
+    }}}
+    std::cout<<"\n 100% done \n results ( log likelihood + models ) are saved in model_parameters.csv";
+    std::cout<<"\nInbounds : "<<inbouds;
+    return 0;
+}
+
+
+
+
+
 

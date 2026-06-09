@@ -35,6 +35,11 @@ Fault::Fault(){
                 if (check_retval(&retval, "CVodeSetLinearSolver", 1)) { throw std::runtime_error("\nError : cannot attach Linear Solver."); }
                 retval = CVodeSetJacFn(this->cvode_mem, Jac);
                 if (check_retval(&retval, "CVodeSetJacFn", 1)) { throw std::runtime_error("\nError : cannot attach Jacobian."); }
+                //erase to make message errors appear
+                SUNLogger logger;
+                SUNContext_GetLogger(sunctx, &logger);
+                SUNLogger_SetErrorFilename(logger, "NUL");   
+                SUNLogger_SetWarningFilename(logger, "NUL");
         }
 
 Fault::~Fault(){    
