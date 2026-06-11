@@ -161,7 +161,7 @@ int main() {
     std::cout<<"compute surface displacement : ";
     auto timeStart = std::chrono::high_resolution_clock::now();
 
-    parallel_tempering_test_out_of_bounds(100000, ParametersPT, G, RES_matrix, t_list) ;
+    parallel_tempering_miror(10000, ParametersPT, G, RES_matrix, t_list) ;
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
@@ -171,7 +171,5 @@ int main() {
     return 0;
 
     std::cout<<"\nparallel tempering done ";
-
-
 
 }
