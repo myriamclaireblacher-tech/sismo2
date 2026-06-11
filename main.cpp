@@ -133,9 +133,9 @@ int main() {
                        << pP[i].Dtau_asigma << "\n";
         }
         param_file.close();
-        std::cout << "\nFichier CSV des paramètres du modèle généré avec succès.\n";
+        std::cout << "\nFichier CSV des parametres du modele genere avec succès.\n";
     } else {
-        std::cerr << "\nErreur : Impossible de créer le fichier CSV des paramètres.\n";
+        std::cerr << "\nErreur : Impossible de creer le fichier CSV des parametres.\n";
     }
     
 
@@ -145,7 +145,7 @@ int main() {
     -------------------------------------------------------------------------------------------------------------------
     */
 
-
+    
     //PT_param ParametersPT(0, 10.0, 0.1, 3.0, 0.0, 1000.0, 0.0, 20.0, 100.0, 10, 4);
 
     PT_param ParametersPT(
@@ -153,7 +153,7 @@ int main() {
         0.5, 1.5,    // b_a : limite la forte instabilité
         0.0, 50.0,   // D_c_inv : MAXIMUM 50 (donc Dc minimum de 2cm), au lieu de 1000 !
         0.0, 5.0,    // Dtau_asigma : un saut de contrainte modéré
-        100.0, 10, 4 // T_max descendu à 100.0, nchains=10, ncold=4
+        1000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
     std::cout<<"\n begin parallel tempering : " ; 
@@ -168,8 +168,66 @@ int main() {
     double timeTotal = duration.count();
     std::cout<<"temps total : "<<timeTotal;
 
-    return 0;
+    
+    
 
     std::cout<<"\nparallel tempering done ";
 
+    /*
+    -------------------------------------------------------------------------------------------------------------------
+                        LECTURE DU .BIN ET EXPORTATION DU DERNIER MODÈLE MCMC
+    -------------------------------------------------------------------------------------------------------------------
+    */
+    std::cout << "\nLecture du fichier binaire pour extraire le dernier modele...\n";
+    
+    // Ouverture du binaire à la fin (ate = at end) pour connaitre sa taille globale
+    std::ifstream bin_file("chain_cold_0.bin", std::ios::binary | std::ios::ate);
+    
+    if (bin_file.is_open()) {
+        std::streamsize file_size = bin_file.tellg();
+        size_t step_size = sizeof(double) + (NSubFaults * sizeof(Param));
+        
+        if (file_size >= step_size) {
+            // On se place exactement au début de la toute dernière sauvegarde
+            bin_file.seekg(file_size - step_size, std::ios::beg);
+            
+            // 1. Lecture de la LLK
+            double best_llk;
+            bin_file.read(reinterpret_cast<char*>(&best_llk), sizeof(double));
+            
+            // 2. Lecture des paramètres
+            std::vector<Param> best_model(NSubFaults);
+            bin_file.read(reinterpret_cast<char*>(best_model.data()), NSubFaults * sizeof(Param));
+            
+            std::cout << "Dernier modele extrait (LLK = " << best_llk << "). Calcul de la reponse...\n";
+            
+            // 3. Calcul de la réponse de surface
+            Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> PRED_matrix(3*Nstations, t_list.size());
+            
+            // On réutilise Faille, G, storage_matrix et t_list qui sont déjà dans ton main
+            surface_response(best_model, t_list, Faille, G, PRED_matrix, storage_matrix);
+            
+            // 4. Exportation dans un nouveau CSV
+            std::ofstream pred_file("last_model_responses.csv");
+            if (pred_file.is_open()) {
+                pred_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
+                for (Eigen::Index j = 0; j < PRED_matrix.cols(); ++j) {
+                    pred_file << t_list[j];
+                    for (Eigen::Index i = 0; i < PRED_matrix.rows(); ++i) {
+                        pred_file << "," << PRED_matrix(i, j);
+                    }
+                    pred_file << "\n";
+                }
+                pred_file.close();
+                std::cout << "Fichier 'last_model_responses.csv' genere avec succes.\n";
+            } else {
+                std::cerr << "Erreur : Impossible de creer last_model_responses.csv\n";
+            }
+        }
+        bin_file.close();
+    } else {
+        std::cerr << "Erreur : Impossible d'ouvrir chain_cold_0.bin\n";
+    }
+
+    return 0;
 }

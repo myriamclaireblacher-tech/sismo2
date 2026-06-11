@@ -394,6 +394,10 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
     int newmodel=0;
     int swapnum=0 ;
     int swapcold=0;
+    int llk_computed=0 ;
+
+    std::cout << "Taille de Param : " << sizeof(Param) << " octets\n";
+    std::cout << "Taille exacte ecrite par etape : " << sizeof(double) + (NSubFaults * sizeof(Param)) << " octets\n";
     //check t_list size, data size
     if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
 
@@ -578,6 +582,7 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
             
             Enew = compute_llk(t_list, data, G , work);
             if (Enew!=-std::numeric_limits<double>::infinity()){
+                llk_computed+=1;
                 double delta  = (Enew - llk[ichain])/T[ichain] ;
                 double alpha  = std::min(0.0, delta);
                 double u      = std::log(unif_dist_intern(gen2) );
@@ -601,7 +606,7 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
         for (int s = 0; s < PT.nchains - 1; s++) {
             int p = rand_chain(gen);
             int q = rand_chain(gen);
-            if (p == q) continue;
+            if ((p == q) ||  (T[p] == T[q])) continue;
 
             // Formule théorique du Parallel Tempering
             double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
@@ -620,6 +625,7 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
     std::cout<<"\nNew Models explored : "<<newmodel;
     std::cout<<"\nswaps : "<<swapnum;
     std::cout<<"\nswaps with coldchains : "<<swapcold;
+    std::cout<<"\ncomputed llk : "<<llk_computed;
 
     return 0;
 }
