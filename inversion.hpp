@@ -45,6 +45,9 @@ double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
 
 
+double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work);
+
 int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
                     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
 
@@ -53,5 +56,8 @@ int parallel_tempering_test_out_of_bounds(const int maxint, const PT_param PT, c
 
 int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
                     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
-                    
+
+int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
+                    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
+   
 #endif

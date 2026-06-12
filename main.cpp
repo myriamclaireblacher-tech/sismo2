@@ -75,7 +75,7 @@ int main() {
     
     
     for (int i=0; i<NSubFaults ; i++){
-            pP.emplace_back(0.01+0.001*i, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
+            pP.emplace_back(0.01, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
         }
         
         
@@ -153,7 +153,7 @@ int main() {
         0.5, 1.5,    // b_a : limite la forte instabilité
         0.0, 50.0,   // D_c_inv : MAXIMUM 50 (donc Dc minimum de 2cm), au lieu de 1000 !
         0.0, 5.0,    // Dtau_asigma : un saut de contrainte modéré
-        1000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
+        10000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
     std::cout<<"\n begin parallel tempering : " ; 
@@ -161,7 +161,7 @@ int main() {
     std::cout<<"compute surface displacement : ";
     auto timeStart = std::chrono::high_resolution_clock::now();
 
-    parallel_tempering_miror(10000, ParametersPT, G, RES_matrix, t_list) ;
+    parallel_tempering_miror(1000, ParametersPT, G, RES_matrix, t_list) ;
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
