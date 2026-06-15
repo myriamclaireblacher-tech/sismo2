@@ -1,9 +1,3 @@
-
-#include "inversion.hpp"
-#include <iostream>
-#include <chrono>
-#include <fstream>
-
 #include "inversion.hpp"
 #include <iostream>
 #include <chrono>
@@ -85,8 +79,7 @@ int main() {
     std::ofstream csv_file("surface_responses.csv");
     if (csv_file.is_open()) {
         // En-tête décrivant chaque colonne
-        //csv_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
-        csv_file << "Time,St1_North,St1_East,St1_Depth\n";
+        csv_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
         
         // Écriture ligne par ligne (chaque ligne = un pas de temps)
         for (Eigen::Index j = 0; j < RES_matrix.cols(); ++j) {
@@ -140,11 +133,11 @@ int main() {
     //PT_param ParametersPT(0, 10.0, 0.1, 3.0, 0.0, 1000.0, 0.0, 20.0, 100.0, 10, 4);
 
     PT_param ParametersPT(
-        0.001, 3.0,    // k_a_sigma : évite le comportement proche de 0
-        0.3, 1.5,    // b_a : limite la forte instabilité
+        0.5, 3.0,    // k_a_sigma : évite le comportement proche de 0
+        0.5, 1.5,    // b_a : limite la forte instabilité
         0.0, 50.0,   // D_c_inv : MAXIMUM 50 (donc Dc minimum de 2cm), au lieu de 1000 !
-        0.0, 10.0,    // Dtau_asigma : un saut de contrainte modéré
-        100000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
+        0.0, 5.0,    // Dtau_asigma : un saut de contrainte modéré
+        10000.0, 8, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
     std::cout<<"\n begin parallel tempering : " ; 
@@ -152,7 +145,7 @@ int main() {
     std::cout<<"compute surface displacement : ";
     auto timeStart = std::chrono::high_resolution_clock::now();
 
-    parallel_tempering_new(1000000, ParametersPT, G, RES_matrix, t_list) ;
+    parallel_tempering_new(1000, ParametersPT, G, RES_matrix, t_list) ;
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;

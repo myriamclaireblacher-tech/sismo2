@@ -40,7 +40,7 @@ double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
     int SR = surface_response(work.pP, t_list, work.fault, G, work.RES_matrix, work.storage_matrix);
-    if (SR!=0) return -10000.0;
+    if (SR!=0) return -1e6f;
     double llk = - (data - work.RES_matrix).array().square().sum();
     return llk;
 }
@@ -676,7 +676,7 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
 
     for (int i=0;i<PT.nchains;i++){
         if (i<PT.ncold) T[i]=1.0 ;
-        else T[i]= std :: exp( unif_dist(gen) * std::log(PT.T_max) ) ; //loguniform repartition
+        else T[i]= std :: exp( i*1.0/(PT.ncold-1) * std::log(PT.T_max) ) ; 
 
     }
 
@@ -690,6 +690,8 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
     //Initial models of the chains    
     std::vector<Param> M;
     M.resize(PT.nchains*NSubFaults);
+
+    
     #pragma omp parallel 
     {
         ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
@@ -698,7 +700,7 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
         /////////////////////////////////
         std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0); ///////////////////////
 
-
+        
         #pragma omp for schedule(dynamic)
         for (int j=0;j<PT.nchains;j++){
             bool reject = true;
@@ -719,12 +721,12 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
 
                 M[j * NSubFaults + i] = Param(p1 * bruit, p2 * bruit, p3 * bruit, p4 * bruit);
             }
-
+            
             //test llk
             work.pP.assign(M.begin() + (j * NSubFaults), 
                            M.begin() + ((j + 1) * NSubFaults));
             llk_i = compute_llk2(t_list, data, G , work);
-            if (llk_i > -9000.0 ) {reject = false;}
+            if (llk_i > -9e5f ) {reject = false;}
             }
             llk[j]=llk_i;
             if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);
@@ -736,7 +738,6 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
 
 
     //Parallel tempering
-
 
     for (int it = 0; it < maxint ; it ++ ){
 
@@ -754,7 +755,7 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
 
             //New model proposal with miror boundaries
 
-            /*
+            
             double prop=0.0;
 
             for (int i=0; i<NSubFaults; i++){
@@ -778,7 +779,7 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
                 else if (prop + work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf) work.pP[i].Dtau_asigma = 2 * PT.Dtau_asigma_inf - work.pP[i].Dtau_asigma - prop ;
                 else work.pP[i].Dtau_asigma   += prop;
             }
-                */
+                
 
             // Remplacement propre du bloc de proposition et du check Out-of-Bounds
             for (int i = 0; i < NSubFaults; i++) {

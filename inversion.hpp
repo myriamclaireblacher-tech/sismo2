@@ -28,7 +28,7 @@ struct PT_param {
 struct ThreadWorkspace {
     std::vector<Param> pP;
     Fault fault;
-    Eigen::Matrix<double, 6, Eigen::Dynamic> RES_matrix;
+    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix;
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> storage_matrix;
 
     ThreadWorkspace(int t_list_size) ;
