@@ -38,8 +38,8 @@ Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT
 
     //open storage file
     std::vector<std::ofstream> files;
-    files.resize(n_cold) ;
-    for (int j=0;j<n_cold; j++){
+    files.resize(n_markow) ;
+    for (int j=0;j<n_markow; j++){
         files[j].open("test_chain_cold_" + std::to_string(j) + ".bin", std::ios::binary);
     }
 
@@ -71,7 +71,7 @@ Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT
 
     
             //save initial model
-        for (int j=0; j<n_cold;j++){
+        for (int j=0; j<n_markow;j++){
                 files[j].write(reinterpret_cast<const char*>(&llk[j]), sizeof(double));
                 files[j].write(reinterpret_cast<const char*>(&P[j]), sizeof(Param));}}
                     
@@ -169,7 +169,7 @@ Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT
                     P[ichain] = P_new ;
                     
                 }
-                if (ichain< n_cold) {
+                if (ichain< n_markow) {
                         double val_pi = llk[ichain];
                         
                         #pragma omp critical(file_write)
@@ -206,7 +206,7 @@ Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT
     std::cout<<"\n 100% done \n results ( log likelihood + models ) are saved in model_parameters.csv";
     std::cout<<"\nlast llk computed"<< llk[1];
     //close files
-    for (int j=0; j<n_cold; j++){
+    for (int j=0; j<n_markow; j++){
         if(files[j].is_open()) files[j].close();
     }
 
@@ -249,12 +249,11 @@ int main() {
         0.3, 10,    // b_a :
         0.0, 1000.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        100000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
+        500000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
     Param PP=parallel_tempering_1faille( 100000, 6, 1, ParametersPT, data, t_list, 0.01);
 
-    
 
     /*
     -----------------------------------------------------------------------------------------------------------------------
@@ -284,8 +283,6 @@ int main() {
     } else {
         std::cerr << "\nErreur : Impossible de creer final_results.csv" << std::endl;
     }
-
-
 
     return 0;
     
