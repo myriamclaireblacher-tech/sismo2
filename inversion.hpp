@@ -18,6 +18,8 @@ struct PT_param {
     double D_c_inv_sup;
     double Dtau_asigma_inf;     //Delta Tau/ (a sigma)
     double Dtau_asigma_sup;     
+    double V0_inf; 
+    double V0_sup;
     double T_max ;
     int nchains;
     int ncold;

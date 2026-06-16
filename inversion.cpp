@@ -3,11 +3,11 @@
 PT_param::PT_param(double k_a_sigma_inf_ent, double k_a_sigma_sup_ent, double b_a_inf_ent, double b_a_sup_ent, double D_c_inv_inf_ent, double D_c_inv_sup_ent, double Dtau_asigma_inf_ent, double Dtau_asigma_sup_ent, double Tmax_ent,
             int nchains_ent, int ncold_ent)
     :k_a_sigma_inf(k_a_sigma_inf_ent),k_a_sigma_sup(k_a_sigma_sup_ent),b_a_inf(b_a_inf_ent), b_a_sup (b_a_sup_ent), D_c_inv_inf(D_c_inv_inf_ent),
-    D_c_inv_sup (D_c_inv_sup_ent), Dtau_asigma_inf(Dtau_asigma_inf_ent), Dtau_asigma_sup (Dtau_asigma_sup_ent), T_max(Tmax_ent),
+    D_c_inv_sup (D_c_inv_sup_ent), Dtau_asigma_inf(Dtau_asigma_inf_ent), Dtau_asigma_sup (Dtau_asigma_sup_ent), V0_inf(0.5*Vinf), V0_sup(1.1*Vinf), T_max(Tmax_ent),
     nchains (nchains_ent), ncold(ncold_ent)
     {}   
 
-
+/*
 ThreadWorkspace::ThreadWorkspace(int t_list_size) {
     pP.resize(NSubFaults);
     RES_matrix.resize(3 * Nstations, t_list_size);
@@ -505,32 +505,6 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
 
             //New model proposal with miror boundaries
 
-            /*
-            double prop=0.0;
-
-            for (int i=0; i<NSubFaults; i++){
-                prop = unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigma;
-                if (prop + work.pP[i].k_a_sigma > PT.k_a_sigma_sup)  work.pP[i].k_a_sigma = 2 * PT.k_a_sigma_sup - work.pP[i].k_a_sigma - prop ; 
-                else if (prop + work.pP[i].k_a_sigma < PT.k_a_sigma_inf) work.pP[i].k_a_sigma = 2 * PT.k_a_sigma_inf - work.pP[i].k_a_sigma - prop ;
-                else work.pP[i].k_a_sigma   += prop;
-
-                prop = unif_dist_plus(gen2) * (PT.b_a_sup         - PT.b_a_inf) * sigma;
-                if (prop + work.pP[i].b_a > PT.b_a_sup)  work.pP[i].k_a_sigma = 2 * PT.b_a_sup - work.pP[i].b_a - prop ; 
-                else if (prop + work.pP[i].b_a < PT.b_a_inf) work.pP[i].k_a_sigma = 2 * PT.b_a_inf - work.pP[i].b_a - prop ;
-                else work.pP[i].b_a   += prop;
-                
-                prop = unif_dist_plus(gen2) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma;
-                if (prop + work.pP[i].D_c_inv > PT.D_c_inv_sup)  work.pP[i].D_c_inv = 2 * PT.D_c_inv_sup - work.pP[i].D_c_inv - prop ; 
-                else if (prop + work.pP[i].D_c_inv < PT.D_c_inv_inf) work.pP[i].D_c_inv = 2 * PT.D_c_inv_inf - work.pP[i].D_c_inv - prop ;
-                else work.pP[i].D_c_inv   += prop;
-
-                prop = unif_dist_plus(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigma;
-                if (prop + work.pP[i].Dtau_asigma > PT.Dtau_asigma_sup)  work.pP[i].Dtau_asigma = 2 * PT.Dtau_asigma_sup - work.pP[i].Dtau_asigma - prop ; 
-                else if (prop + work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf) work.pP[i].Dtau_asigma = 2 * PT.Dtau_asigma_inf - work.pP[i].Dtau_asigma - prop ;
-                else work.pP[i].Dtau_asigma   += prop;
-            }
-                */
-
             // Remplacement propre du bloc de proposition et du check Out-of-Bounds
             for (int i = 0; i < NSubFaults; i++) {
                 
@@ -765,8 +739,8 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
                 else work.pP[i].k_a_sigma   += prop;
 
                 prop = unif_dist_plus(gen2) * (PT.b_a_sup         - PT.b_a_inf) * sigma;
-                if (prop + work.pP[i].b_a > PT.b_a_sup)  work.pP[i].k_a_sigma = 2 * PT.b_a_sup - work.pP[i].b_a - prop ; 
-                else if (prop + work.pP[i].b_a < PT.b_a_inf) work.pP[i].k_a_sigma = 2 * PT.b_a_inf - work.pP[i].b_a - prop ;
+                if (prop + work.pP[i].b_a > PT.b_a_sup)  work.pP[i].b_a = 2 * PT.b_a_sup - work.pP[i].b_a - prop ; 
+                else if (prop + work.pP[i].b_a < PT.b_a_inf) work.pP[i].b_a = 2 * PT.b_a_inf - work.pP[i].b_a - prop ;
                 else work.pP[i].b_a   += prop;
                 
                 prop = unif_dist_plus(gen2) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigma;
@@ -886,10 +860,12 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
     std::cout<<"\nswaps : "<<swapnum;
     std::cout<<"\nswaps with coldchains : "<<swapcold;
     std::cout<<"\ncomputed llk : "<<llk_computed;
+    std::cout<<"\nlast llk"<< llk[1];
 
     return 0;
 }
 
+*/
 
 
 
