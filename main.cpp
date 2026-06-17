@@ -169,7 +169,7 @@ Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT
                     P[ichain] = P_new ;
                     
                 }
-                if (ichain< n_markow) {
+                if ((ichain< n_markow)&&(accept=true)) {
                         double val_pi = llk[ichain];
                         
                         #pragma omp critical(file_write)
@@ -246,14 +246,20 @@ int main() {
     
     PT_param ParametersPT(
         0.001, 10.0,    // k_a_sigma
-        0.3, 10,    // b_a :
+        0.3, 10,    // b_a : 1/10 - 3
         0.0, 1000.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
         500000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
-    Param PP=parallel_tempering_1faille( 100000, 6, 1, ParametersPT, data, t_list, 0.01);
+    auto timeStart = std::chrono::high_resolution_clock::now();
 
+    Param PP=parallel_tempering_1faille( 500000, 6, 1, ParametersPT, data, t_list, 0.005);
+
+    auto timeEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = timeEnd - timeStart;
+    double timeTotal = duration.count();
+    std::cout<<"\ntemps total : "<<timeTotal;
 
     /*
     -----------------------------------------------------------------------------------------------------------------------

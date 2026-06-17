@@ -386,7 +386,7 @@ int main() {
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
     double timeTotal = duration.count();
-    std::cout<<"temps total : "<<timeTotal;
+    std::cout<<"\ntemps total : "<<timeTotal;
 
     
     
