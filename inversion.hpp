@@ -23,8 +23,9 @@ struct PT_param {
     double T_max ;
     int nchains;
     int ncold;
+    int burn_in_steps;
     PT_param(double k_a_sigma_inf_ent, double k_a_sigma_sup_ent, double b_a_inf_ent, double b_a_sup_ent, double D_c_inv_inf_ent, double D_c_inv_sup_ent, double Dtau_asigma_inf_ent, double Dtau_asigma_sup_ent, double Tmax_ent,
-            int nchains_ent, int ncold_ent)  ;
+            int nchains_ent, int ncold_ent, int burn_in_steps_ent)  ;
 };
 
 struct ThreadWorkspace {
@@ -43,18 +44,21 @@ struct ColdChainSaver {
     void save_step(const std::vector<Param>& pP, double energy) ;
 };
 
-Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT_param PT, const Eigen::Ref<Eigen::RowVectorXd> & data, const std::vector<sunrealtype> & t_list, double sigma= 0.005, int seed=42 );
+Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold,int  burn_in_steps, const PT_param PT, const Eigen::Ref<Eigen::RowVectorXd> & data, const std::vector<sunrealtype> & t_list, int seed );
 
-Param parallel_tempering_adaptatif(int n_steps, int n_markow, int n_cold, int burn_in_steps, const PT_param PT, const Eigen::Ref<Eigen::RowVectorXd> & data, const std::vector<sunrealtype> & t_list, int seed );
+std::vector<Param> parallel_tempering_corrected(const int maxint,  const PT_param PT,  const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype> & t_list, const int seed =42);
 
 double pi(const Param & P, const std::vector<sunrealtype> & t_list, const Eigen::Ref<Eigen::RowVectorXd> & data, Fault & F, Eigen::Ref<Eigen::RowVectorXd> & slip_list);
 
+double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work);
+
+/*
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
 
 
-double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
-                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work);
+
 
 int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
                     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
@@ -67,5 +71,7 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
 
 int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, const
                     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list,  const int seed=42,const double sigma=0.005);
-   
+*/
+
+
 #endif

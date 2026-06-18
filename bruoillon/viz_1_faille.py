@@ -19,12 +19,13 @@ def plot_all_mcmc_chains():
         print("Erreur : Aucun fichier trouvé.")
         return
 
-    # 1. CRÉATION DE LA FIGURE PRINCIPALE
+    # ==========================================================
+    # 1. CRÉATION DE LA FIGURE PRINCIPALE (TRACES)
+    # ==========================================================
     fig, axes = plt.subplots(6, 1, figsize=(12, 14), sharex=True)
     colors = plt.cm.tab10(np.linspace(0, 1, len(bin_files)))
     param_names = ["k_a_sigma", "b_a", "D_c_inv", "Dtau_asigma", "V0_"]
     
-    # Listes pour stocker les min/max initiaux afin de pré-remplir le panneau
     y_mins = [float('inf')] * 6
     y_maxs = [float('-inf')] * 6
 
@@ -44,22 +45,18 @@ def plot_all_mcmc_chains():
         llk = data[:, 0]
         params = [data[:, 7], data[:, 8], data[:, 9], data[:, 10], data[:, 6]]
         
-        # Sauvegarde des limites pour le panneau de contrôle
         y_mins[0] = min(y_mins[0], np.min(llk))
         y_maxs[0] = max(y_maxs[0], np.max(llk))
         
-        # Plot LLK
         axes[0].plot(steps, llk, color=colors[idx], linewidth=line_width, 
                      alpha=alpha_val, zorder=zorder, label=filename)
         
-        # Plot paramètres
         for i in range(5):
             y_mins[i+1] = min(y_mins[i+1], np.min(params[i]))
             y_maxs[i+1] = max(y_maxs[i+1], np.max(params[i]))
             axes[i+1].plot(steps, params[i], color=colors[idx], linewidth=line_width, 
                            alpha=alpha_val, zorder=zorder)
 
-    # Mise en forme de la figure principale
     axes[0].set_ylabel("Log-Likelihood", fontweight='bold')
     axes[0].set_title("Superposition des traces MCMC", fontweight='bold', fontsize=14)
     axes[0].legend(fontsize='x-small', loc='best')
@@ -71,42 +68,30 @@ def plot_all_mcmc_chains():
         ax.axhline(y=true_values[i], color='black', linestyle='--', linewidth=1.5)
         if i == 0: ax.legend(fontsize='small')
     
-    axes[-1].set_xlabel("Pas MCMC", fontweight='bold')
+    axes[-1].set_xlabel("Pas MCMC (ou lignes enregistrées)", fontweight='bold')
     plt.tight_layout()
 
     # ==========================================================
-    # 2. CRÉATION DU PANNEAU DE CONTROLE DES AXES Y
+    # 2. PANNEAU DE CONTROLE DES AXES Y (inchangé)
     # ==========================================================
-    # Fenêtre séparée un peu plus grande pour accueillir les 12 champs
     fig_ctrl = plt.figure("Contrôle des Axes Y", figsize=(6, 8))
-    fig_ctrl.text(0.5, 0.96, "Ajustement des échelles verticales (Y)", 
-                  ha="center", va="top", fontweight="bold", fontsize=12)
-
-    # Titres des colonnes
+    fig_ctrl.text(0.5, 0.96, "Ajustement des échelles verticales (Y)", ha="center", va="top", fontweight="bold", fontsize=12)
     fig_ctrl.text(0.45, 0.91, "Y Min", ha="center", fontweight="bold")
     fig_ctrl.text(0.75, 0.91, "Y Max", ha="center", fontweight="bold")
 
-    # Listes pour conserver les références des TextBox en mémoire (sinon Python les détruit)
     text_boxes_min = []
     text_boxes_max = []
-    
-    # Noms de toutes les lignes du graphique (LLK + 5 paramètres)
     row_names = ["Log-Likelihood", "k_a_sigma", "b_a", "D_c_inv", "Dtau_asigma", "V0_"]
 
-    # Génération automatique des 12 boîtes de saisie
     for i in range(6):
-        y_pos = 0.82 - (i * 0.13) # Calcul de la position verticale de la ligne
-        
-        # Label de la ligne
+        y_pos = 0.82 - (i * 0.13)
         fig_ctrl.text(0.05, y_pos + 0.03, row_names[i], va="center", fontweight="bold", fontsize=10)
         
-        # Axes pour les zones de texte [gauche, bas, largeur, hauteur]
         ax_min = fig_ctrl.add_axes([0.33, y_pos, 0.25, 0.06])
         ax_max = fig_ctrl.add_axes([0.63, y_pos, 0.25, 0.06])
         
-        # Formater les valeurs par défaut proprement (scientifique si nécessaire)
-        init_min = f"{y_mins[i]:.4g}"
-        init_max = f"{y_maxs[i]:.4g}"
+        init_min = f"{y_mins[i]:.4g}" if y_mins[i] != float('inf') else "0"
+        init_max = f"{y_maxs[i]:.4g}" if y_maxs[i] != float('-inf') else "0"
         
         box_min = TextBox(ax_min, '', initial=init_min)
         box_max = TextBox(ax_max, '', initial=init_max)
@@ -114,14 +99,11 @@ def plot_all_mcmc_chains():
         text_boxes_min.append(box_min)
         text_boxes_max.append(box_max)
 
-        # Création d'une fonction de mise à jour spécifique à la ligne i (liaison tardive via l'argument par défaut)
         def make_update_handler(row_index):
             def update_y_axis(text):
                 try:
                     val_min = float(text_boxes_min[row_index].text)
                     val_max = float(text_boxes_max[row_index].text)
-                    
-                    # On applique le changement uniquement sur le sous-graphique concerné
                     axes[row_index].set_ylim(val_min, val_max)
                     fig.canvas.draw_idle()
                 except ValueError:
@@ -133,7 +115,7 @@ def plot_all_mcmc_chains():
         box_max.on_submit(handler)
 
     # ==========================================================
-    # Graphique Fit (inchangé)
+    # 3. GRAPHIQUE FIT (Cible vs Prédiction)
     # ==========================================================
     if os.path.exists("final_results.csv"):
         df = pd.read_csv("final_results.csv")
@@ -145,6 +127,99 @@ def plot_all_mcmc_chains():
         ax_fit.grid(True, linestyle=":", alpha=0.6)
         ax_fit.legend()
         plt.tight_layout()
+
+    # ==========================================================
+    # 4. CORNER PLOT AVEC HISTOGRAMMES DYNAMIQUES
+    # ==========================================================
+    filename_cold = "test_chain_cold_0.bin"
+    if os.path.exists(filename_cold):
+        data_cold = np.fromfile(filename_cold, dtype=np.float64)
+        n_steps_cold = len(data_cold) // 13
+        
+        if n_steps_cold > 0:
+            data_cold = data_cold[:n_steps_cold * 13].reshape((n_steps_cold, 13))
+            
+            n_burn_phase = 100000 
+            if n_burn_phase >= n_steps_cold:
+                burn_idx = n_steps_cold // 2
+            else:
+                burn_idx = n_burn_phase
+
+            # Extraction avec log10 pour D_c_inv
+            params_cold = [
+                data_cold[burn_idx:, 7],           # k_a_sigma
+                data_cold[burn_idx:, 8],           # b_a
+                np.log10(data_cold[burn_idx:, 9]), # log10(D_c_inv)
+                data_cold[burn_idx:, 10],          # Dtau_asigma
+                data_cold[burn_idx:, 6]            # V0_
+            ]
+
+            corner_param_names = ["k_a_sigma", "b_a", "log10(D_c_inv)", "Dtau_asigma", "V0_"]
+            corner_true_values = [k_asigma, b_a, np.log10(D_c_inv), dtau_asigma, V0__]
+
+            fig_corner, axes_corner = plt.subplots(5, 5, figsize=(15, 15))
+            fig_corner.suptitle(f"Distributions a posteriori (Chaîne 0, Burn-in : {burn_idx} lignes)\nZoomer sur les diagonales pour recalculer les histogrammes !", 
+                                fontweight='bold', fontsize=16)
+
+            # --- FONCTION POUR HISTOGRAMME DYNAMIQUE ---
+            def setup_dynamic_hist(ax, data, true_val, add_legend):
+                def draw_hist(xmin, xmax):
+                    # Supprime uniquement les barres d'histogramme (pas la ligne cible)
+                    for p in reversed(ax.patches):
+                        p.remove()
+                    
+                    mask = (data >= xmin) & (data <= xmax)
+                    visible_data = data[mask]
+                    
+                    if len(visible_data) > 5:
+                        ax.hist(visible_data, bins=50, range=(xmin, xmax), 
+                                color='royalblue', edgecolor='black', alpha=0.7, density=True)
+                    ax.set_xlim(xmin, xmax)
+
+                def on_xlim_changed(axes_obj):
+                    if getattr(axes_obj, '_is_updating', False): return
+                    axes_obj._is_updating = True
+                    xmin, xmax = axes_obj.get_xlim()
+                    draw_hist(xmin, xmax)
+                    axes_obj._is_updating = False
+
+                # Initialisation
+                xmin, xmax = np.min(data), np.max(data)
+                draw_hist(xmin, xmax)
+                ax.axvline(true_val, color='red', linestyle='--', linewidth=2.5, label="Cible")
+                if add_legend: ax.legend(fontsize='small')
+                
+                # Connexion de l'événement de zoom
+                ax.callbacks.connect('xlim_changed', on_xlim_changed)
+            # -------------------------------------------
+
+            for i in range(5):
+                for j in range(5):
+                    ax = axes_corner[i, j]
+                    
+                    if i == j:
+                        # Diagonale : Application de la fonction dynamique
+                        setup_dynamic_hist(ax, params_cold[i], corner_true_values[i], add_legend=(i==0))
+                        
+                    elif i > j:
+                        # Triangle inférieur : Histogramme 2D
+                        ax.hist2d(params_cold[j], params_cold[i], bins=40, cmap='Blues', cmin=1)
+                        ax.plot(corner_true_values[j], corner_true_values[i], marker='+', color='red', markersize=10, markeredgewidth=2)
+                        
+                    else:
+                        ax.axis('off')
+                        
+                    # Gestion des labels
+                    if i == 4: ax.set_xlabel(corner_param_names[j], fontweight='bold')
+                    else:
+                        if i >= j: ax.set_xticklabels([]) 
+                        
+                    if j == 0 and i > 0: ax.set_ylabel(corner_param_names[i], fontweight='bold')
+                    else:
+                        if i >= j: ax.set_yticklabels([]) 
+
+            plt.tight_layout()
+            fig_corner.subplots_adjust(top=0.94)
 
     plt.show()
 

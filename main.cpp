@@ -3,84 +3,198 @@
 #include <chrono>
 #include <fstream>
 
+#include "inversion.hpp"
+#include <iostream>
+#include <chrono>
+#include <fstream>
 
 int main() {
 
+    //1 sous faille, 1 station, G choisi random
     /*
-    -------------------------------------------------------------------------------------------
-                    GENERATE & STORE DATA
-    -------------------------------------------------------------------------------------------
+    -----------------------------------------------------------------------------------------------------------------------
+                        EXTRACT GREEN MATRIX
+    -----------------------------------------------------------------------------------------------------------------------
     */
+    std::cout<<"extract G : " ;
+    Eigen::Matrix<double, 3*Nstations, NSubFaults> G{0.5, 0.4, -0.77};
+    
+
+    /*
+    -----------------------------------------------------------------------------------------------------------------------
+                        Compute  surface displacement
+    -----------------------------------------------------------------------------------------------------------------------
+    */
+    
+    omp_set_num_threads(NCPU);
+
+    //t_list
     std::vector<sunrealtype> t_list(300);
     for (int i=0; i<300; ++i){
         t_list[i]=5.0/300.0*i;
     }
 
-    //prepare data storage and tools
-    Fault Faille;
-    Eigen::RowVectorXd slip_data(300);
-    Eigen::Ref<Eigen::RowVectorXd> data(slip_data);
+    std::vector<Param> pP;
+    pP.reserve(NSubFaults);
 
-    //parameters of te Fault of the data
-    Param fault_param(0.01, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
-    Faille.ODE_solver(t_list, data, fault_param);
+    Fault Faille;
+
+    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix(3*Nstations, t_list.size());
+    Eigen::Matrix<double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> storage_matrix(NSubFaults, t_list.size());
+
+
+    for (int i=0; i<NSubFaults ; i++){
+            pP.emplace_back(0.01, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
+        }
+
+    surface_response(pP,  t_list, Faille , G, RES_matrix,  storage_matrix);
     
 
     /*
-    -----------------------------------------------------------------------------------------------------------------------
-                        Parallel tempering
-    -----------------------------------------------------------------------------------------------------------------------
+    -------------------------------------------------------------------------------------------------------------------
+                    EXPORT DATA FOR VIZUALISATION
+    -------------------------------------------------------------------------------------------------------------------
     */
+   /*
+    // --- Début du bloc d'exportation CSV --- (écrit par une ia j'avais la flemme)
+    std::ofstream csv_file("surface_responses.csv");
+    if (csv_file.is_open()) {
+        // En-tête décrivant chaque colonne
+        csv_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
+        
+        // Écriture ligne par ligne (chaque ligne = un pas de temps)
+        for (Eigen::Index j = 0; j < RES_matrix.cols(); ++j) {
+            csv_file << t_list[j];
+            for (Eigen::Index i = 0; i < RES_matrix.rows(); ++i) {
+                csv_file << "," << RES_matrix(i, j);
+            }
+            csv_file << "\n";
+        }
+        csv_file.close();
+        std::cout << "\nFichier CSV généré avec succès.\n";
+    } else {
+        std::cerr << "\nErreur : Impossible de créer le fichier CSV.\n";
+    }
+    // --- Fin du bloc d'exportation CSV ---
+    */
+
+
+    /*
+    -------------------------------------------------------------------------------------------------------------------
+                        EXPORTATION DES PARAMÈTRES DU MODÈLE (pP)
+    -------------------------------------------------------------------------------------------------------------------
+    */
+
+    /*
+    std::ofstream param_file("model_parameters.csv");
+    if (param_file.is_open()) {
+        // En-tête décrivant les colonnes pour chaque sous-faille
+        // (Ajuste les noms de colonnes selon les variables membres exactes de ta classe Param)
+        param_file << "SubFault_Index,k_a_sigma,b_a,D_c_inv,Dtau_asigma\n";
+        
+        // Écriture ligne par ligne (chaque ligne = une sous-faille)
+        for (size_t i = 0; i < pP.size(); ++i) {
+            param_file << i << ","
+                       << pP[i].k_a_sigma << ","
+                       << pP[i].b_a << ","
+                       << pP[i].D_c_inv << ","
+                       << pP[i].Dtau_asigma << "\n";
+        }
+        param_file.close();
+        std::cout << "\nFichier CSV des parametres du modele genere avec succès.\n";
+    } else {
+        std::cerr << "\nErreur : Impossible de creer le fichier CSV des parametres.\n";
+    }
+        */
     
+
+        /*
+    -------------------------------------------------------------------------------------------------------------------
+                        PREPARE INVERSION STORAGE
+    -------------------------------------------------------------------------------------------------------------------
+    */
+
+    
+    //PT_param ParametersPT(0, 10.0, 0.1, 3.0, 0.0, 1000.0, 0.0, 20.0, 100.0, 10, 4);
+
     PT_param ParametersPT(
-        0.001, 10.0,    // k_a_sigma
-        0.3, 10,    // b_a : 1/10 - 3
-        0.0, 1000.0,   // D_c_inv 
-        0.0, 10.0,    // Dtau_asigma 
-        2000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
+        0.5, 3.0,    // k_a_sigma : évite le comportement proche de 0
+        0.5, 1.5,    // b_a : limite la forte instabilité
+        0.0, 50.0,   // D_c_inv : MAXIMUM 50 (donc Dc minimum de 2cm), au lieu de 1000 !
+        0.0, 5.0,    // Dtau_asigma : un saut de contrainte modéré
+        10000.0, 8, 1, // T_max descendu à 100.0, nchains=10, ncold=4
+        10000           //burn in steps
     );
+
 
     auto timeStart = std::chrono::high_resolution_clock::now();
 
-    Param PP=parallel_tempering_adaptatif( 500000, 6, 1, 100000, ParametersPT, data, t_list, 20);
+    parallel_tempering_corrected(50000, ParametersPT, G, RES_matrix, t_list) ;
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
     double timeTotal = duration.count();
-    std::cout<<"\ntemps total : "<<timeTotal;
+    std::cout<<"temps total : "<<timeTotal;
 
-    std::cout<<PP;
+    
+
 
     /*
-    -----------------------------------------------------------------------------------------------------------------------
-                        Export results
-    -----------------------------------------------------------------------------------------------------------------------
+    -------------------------------------------------------------------------------------------------------------------
+                        LECTURE DU .BIN ET EXPORTATION DU DERNIER MODÈLE MCMC
+    -------------------------------------------------------------------------------------------------------------------
     */
-
-    Eigen::RowVectorXd slip_data2(300);
-    Eigen::Ref<Eigen::RowVectorXd> data2(slip_data2);
-
-    Faille.ODE_solver(t_list, data2, PP);
-
+   /*
+    std::cout << "\nLecture du fichier binaire pour extraire le dernier modele...\n";
     
-    std::ofstream final_csv("final_results.csv");
-    if (final_csv.is_open()) {
-        // En-tête : Time, Cible, Prediction
-        final_csv << "Time,Target,Prediction\n";
+    // Ouverture du binaire à la fin (ate = at end) pour connaitre sa taille globale
+    std::ifstream bin_file("chain_cold_0.bin", std::ios::binary | std::ios::ate);
+    
+    if (bin_file.is_open()) {
+        std::streamsize file_size = bin_file.tellg();
+        size_t step_size = sizeof(double) + (NSubFaults * sizeof(Param));
         
-        for (int i = 0; i < 300; ++i) {
-            final_csv << t_list[i] << "," 
-                      << data(i) << "," 
-                      << data2(i) << "\n";
+        if (file_size >= step_size) {
+            // On se place exactement au début de la toute dernière sauvegarde
+            bin_file.seekg(file_size - step_size, std::ios::beg);
+            
+            // 1. Lecture de la LLK
+            double best_llk;
+            bin_file.read(reinterpret_cast<char*>(&best_llk), sizeof(double));
+            
+            // 2. Lecture des paramètres
+            std::vector<Param> best_model(NSubFaults);
+            bin_file.read(reinterpret_cast<char*>(best_model.data()), NSubFaults * sizeof(Param));
+            
+            std::cout << "Dernier modele extrait (LLK = " << best_llk << "). Calcul de la reponse...\n";
+            
+            // 3. Calcul de la réponse de surface
+            Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> PRED_matrix(3*Nstations, t_list.size());
+            
+            // On réutilise Faille, G, storage_matrix et t_list qui sont déjà dans ton main
+            surface_response(best_model, t_list, Faille, G, PRED_matrix, storage_matrix);
+            
+            // 4. Exportation dans un nouveau CSV
+            std::ofstream pred_file("last_model_responses.csv");
+            if (pred_file.is_open()) {
+                pred_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
+                for (Eigen::Index j = 0; j < PRED_matrix.cols(); ++j) {
+                    pred_file << t_list[j];
+                    for (Eigen::Index i = 0; i < PRED_matrix.rows(); ++i) {
+                        pred_file << "," << PRED_matrix(i, j);
+                    }
+                    pred_file << "\n";
+                }
+                pred_file.close();
+                std::cout << "Fichier 'last_model_responses.csv' genere avec succes.\n";
+            } else {
+                std::cerr << "Erreur : Impossible de creer last_model_responses.csv\n";
+            }
         }
-        
-        final_csv.close();
-        std::cout << "\nResultats exportes dans 'final_results.csv' avec succes." << std::endl;
+        bin_file.close();
     } else {
-        std::cerr << "\nErreur : Impossible de creer final_results.csv" << std::endl;
+        std::cerr << "Erreur : Impossible d'ouvrir chain_cold_0.bin\n";
     }
-
+    */
     return 0;
-    
-} 
-
+}
