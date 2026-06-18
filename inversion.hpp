@@ -43,6 +43,12 @@ struct ColdChainSaver {
     void save_step(const std::vector<Param>& pP, double energy) ;
 };
 
+Param parallel_tempering_1faille(int n_steps, int n_markow, int n_cold, const PT_param PT, const Eigen::Ref<Eigen::RowVectorXd> & data, const std::vector<sunrealtype> & t_list, double sigma= 0.005, int seed=42 );
+
+Param parallel_tempering_adaptatif(int n_steps, int n_markow, int n_cold, int burn_in_steps, const PT_param PT, const Eigen::Ref<Eigen::RowVectorXd> & data, const std::vector<sunrealtype> & t_list, int seed );
+
+double pi(const Param & P, const std::vector<sunrealtype> & t_list, const Eigen::Ref<Eigen::RowVectorXd> & data, Fault & F, Eigen::Ref<Eigen::RowVectorXd> & slip_list);
+
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;
 

@@ -35,6 +35,18 @@ class Param{
         {}
 
         Param() = default ;
+
+        friend std::ostream& operator<<(std::ostream& os, const Param& p) {
+            os << "Param {\n"
+               
+               << "    k/asigma   : " << p.k_a_sigma << "\n"
+               << "    b/a         : " << p.b_a << "\n"
+               << "    1/D_c     : " << p.D_c_inv << "\n"
+               << "    Dtau/asigma : " << p.Dtau_asigma << "\n"
+               << "    V0_         : " << p.V0_ << "\n"
+               << "}";
+            return os;
+        }
 };
 
 #endif

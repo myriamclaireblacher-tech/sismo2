@@ -37,12 +37,12 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 1000.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        2000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
+        20000.0, 6, 1 // T_max descendu à 100.0, nchains=10, ncold=4
     );
 
     auto timeStart = std::chrono::high_resolution_clock::now();
 
-    Param PP=parallel_tempering_adaptatif( 500000, 6, 1, 100000, ParametersPT, data, t_list, 20);
+    Param PP=parallel_tempering_1faille( 1000000, 6, 1, ParametersPT, data, t_list, 0.008, 20);
 
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = timeEnd - timeStart;
