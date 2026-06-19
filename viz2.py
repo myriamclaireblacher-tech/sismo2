@@ -1,181 +1,143 @@
-import os
-import struct
-import glob
+import matplotlib
+matplotlib.use('TkAgg') 
+
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import glob
+import os
+import pandas as pd
 
-# --- CONFIGURATION EXACTE ---
-NSubFaults = 1
-BYTES_PER_PARAM = 96
-step_size_bytes = 8 + (NSubFaults * BYTES_PER_PARAM)
+# Valeurs cibles
+k_asigma    = 0.01 / 0.4
+b_a         = 0.17 / 0.4
+D_c_inv     = 1.0 / 0.1
+dtau_asigma = 2.0 / 0.4
+V0__        = 0.08 * 100.0 / (365.0 * 24.0)
+true_values = [k_asigma, b_a, D_c_inv, dtau_asigma, V0__]
 
-bin_files = sorted(glob.glob("chain_cold_*.bin"))
-if not bin_files:
-    print("Erreur : Aucun fichier 'chain_cold_X.bin' trouvé.")
-    exit()
+n_burn_phase = 2000000
 
-num_chains = len(bin_files)
-colors = plt.cm.tab10(np.linspace(0, 1, num_chains))
-
-# Mappage EXACT de la mémoire de ta classe Param C++ (12 doubles = 96 octets)
+# Mappage de la mémoire C++ (1 LLK + 12 variables de la classe Param)
 dt = np.dtype([
+    ('llk', '<f8'),
     ('k', '<f8'), ('a_sigma', '<f8'), ('b_sigma', '<f8'), ('D_c', '<f8'), 
-    ('V0_', '<f8'), ('Dtau', '<f8'), 
+    ('Dtau', '<f8'), ('V0_', '<f8'), 
     ('k_a_sigma', '<f8'), ('b_a', '<f8'), ('D_c_inv', '<f8'), ('Dtau_asigma', '<f8'), 
     ('coeff1', '<f8'), ('coeff2', '<f8')
 ])
 
-# =====================================================================
-# LECTURE UNIQUE DES DONNÉES
-# =====================================================================
-models_data = {}
-param_history = {}
-all_llk_histories = {}
-
-for idx, file_path in enumerate(bin_files):
-    chain_idx = file_path.split("_")[-1].replace(".bin", "")
-    num_steps = os.path.getsize(file_path) // step_size_bytes
-    if num_steps == 0: continue
+def plot_histograms_and_fit():
+    # ==========================================================
+    # 1. CORNER PLOT (CLASSIQUE ET RAPIDE)
+    # ==========================================================
+    filename_cold = "chain_cold_0.bin"
+    if os.path.exists(filename_cold):
+        print("Lecture des données MCMC...")
+        data_cold = np.fromfile(filename_cold, dtype=dt)
+        n_steps_cold = len(data_cold)
         
-    llk_history = np.zeros(num_steps)
-    
-    # Pré-allocation en utilisant les vrais noms des paramètres
-    param_history[chain_idx] = {
-        'k_a_sigma': np.zeros(num_steps),
-        'b_a': np.zeros(num_steps),
-        'D_c_inv': np.zeros(num_steps),
-        'Dtau_asigma': np.zeros(num_steps)
-    }
-    
-    first_model = last_model = None
-    
-    with open(file_path, "rb") as f:
-        for step in range(num_steps):
-            llk_bytes = f.read(8)
-            if not llk_bytes: break
-            llk_history[step] = struct.unpack("d", llk_bytes)[0]
+        if n_steps_cold > 0:
+            burn_idx = n_steps_cold // 2 if n_burn_phase >= n_steps_cold else n_burn_phase
+
+            # Sécurité pour le log10 (évite les valeurs négatives ou nulles)
+            safe_Dc_inv = np.where(data_cold['D_c_inv'][burn_idx:] > 0, data_cold['D_c_inv'][burn_idx:], 1e-12)
+
+            params_cold = [
+                data_cold['k_a_sigma'][burn_idx:],           
+                data_cold['b_a'][burn_idx:],           
+                np.log10(safe_Dc_inv), 
+                data_cold['Dtau_asigma'][burn_idx:],          
+                data_cold['V0_'][burn_idx:]            
+            ]
+
+            corner_param_names = ["k_a_sigma", "b_a", "log10(D_c_inv)", "Dtau_asigma", "V0_"]
+            corner_true_values = [k_asigma, b_a, np.log10(D_c_inv), dtau_asigma, V0__]
+
+            fig_corner, axes_corner = plt.subplots(5, 5, figsize=(15, 15))
+            fig_corner.suptitle(f"Distributions a posteriori (Burn-in : {burn_idx})", fontweight='bold', fontsize=16)
+
+            # --- SYNCHRONISATION DES AXES ---
+            for i in range(5):
+                for j in range(5):
+                    if i >= j:
+                        if i != j: axes_corner[i, j].sharex(axes_corner[j, j])
+                        if i > j and j > 0: axes_corner[i, j].sharey(axes_corner[i, 0])
+
+            print("Génération du Corner Plot...")
+            # --- DESSIN DES HISTOGRAMMES ---
+            for i in range(5):
+                for j in range(5):
+                    ax = axes_corner[i, j]
+                    
+                    if i == j: # DIAGONALE (Histogramme 1D)
+                        ax.hist(params_cold[i], bins=50, color='royalblue', edgecolor='black', alpha=0.7, density=True)
+                        ax.axvline(corner_true_values[i], color='red', linestyle='--', linewidth=2.5, label="Cible")
+                        if i == 0: ax.legend(fontsize='small')
+                        
+                    elif i > j: # GRAPHIQUES 2D (hist2d)
+                        ax.hist2d(params_cold[j], params_cold[i], bins=40, cmap='Blues', cmin=1)
+                        ax.plot(corner_true_values[j], corner_true_values[i], marker='+', color='red', markersize=10, markeredgewidth=2)
+
+                    else: # TRIANGLE SUPÉRIEUR VIDE
+                        ax.axis('off')
+                        
+                    # --- AFFICHAGE DES NOMS DES PARAMÈTRES ---
+                    if i == 4: 
+                        ax.set_xlabel(corner_param_names[j], fontweight='bold')
+                    else:
+                        if i >= j: ax.set_xticklabels([]) 
+                        
+                    if j == 0 and i > 0: 
+                        ax.set_ylabel(corner_param_names[i], fontweight='bold')
+                    else:
+                        if i >= j: ax.set_yticklabels([]) 
+
+            plt.tight_layout()
+            fig_corner.subplots_adjust(top=0.94)
+    else:
+        print(f"Erreur : Fichier '{filename_cold}' introuvable.")
+
+
+    # ==========================================================
+    # 2. GRAPHIQUE FIT (TOUTES STATIONS / COMPOSANTES)
+    # ==========================================================
+    if os.path.exists("surface_responses.csv") and os.path.exists("final_results.csv"):
+        print("Génération du graphique de Fit des stations...")
+        df_target = pd.read_csv("surface_responses.csv")
+        df_pred = pd.read_csv("final_results.csv")
+
+        station_cols = [c for c in df_target.columns if c.endswith('_North')]
+        stations = [c.split('_')[0] for c in station_cols]
+        num_stations = len(stations)
+
+        if num_stations > 0:
+            fig_disp, axes_disp = plt.subplots(3, num_stations, figsize=(5 * num_stations, 9), sharex=True)
+            if num_stations == 1: axes_disp = axes_disp.reshape(3, 1)
+
+            components = ["North", "East", "Depth"]
+            titles = ["Nord", "Est", "Profondeur"]
             
-            model_bytes = f.read(NSubFaults * BYTES_PER_PARAM)
-            raw_data = np.frombuffer(model_bytes, dtype=dt)
-            
-            # Stockage de la trace MCMC
-            param_history[chain_idx]['k_a_sigma'][step] = raw_data['k_a_sigma'][0]
-            param_history[chain_idx]['b_a'][step] = raw_data['b_a'][0]
-            param_history[chain_idx]['D_c_inv'][step] = raw_data['D_c_inv'][0]
-            param_history[chain_idx]['Dtau_asigma'][step] = raw_data['Dtau_asigma'][0]
-            
-            # Conservation du premier et dernier modèle
-            if step == 0 or step == num_steps - 1:
-                model_array = np.column_stack((
-                    raw_data['k_a_sigma'], raw_data['b_a'], 
-                    raw_data['D_c_inv'], raw_data['Dtau_asigma']
-                ))
-                if step == 0: first_model = model_array.copy()
-                if step == num_steps - 1: last_model = model_array.copy()
-                
-    models_data[chain_idx] = (first_model, last_model)
-    all_llk_histories[chain_idx] = llk_history
+            for s_idx, station in enumerate(stations):
+                for c_idx, comp in enumerate(components):
+                    ax = axes_disp[c_idx, s_idx]
+                    col_name = f"{station}_{comp}"
+                    
+                    if col_name in df_target.columns and col_name in df_pred.columns:
+                        ax.plot(df_target["Time"], df_target[col_name], 'k--', label="Cible (Data)", linewidth=2, alpha=0.7)
+                        ax.plot(df_pred["Time"], df_pred[col_name], 'r-', label="Modèle Final", linewidth=1.5)
+                    
+                    ax.grid(True, linestyle=":", alpha=0.6)
+                    
+                    if c_idx == 0: ax.set_title(f"{station} - {titles[c_idx]}", fontweight='bold')
+                    else: ax.set_title(f"{titles[c_idx]}")
+                        
+                    if s_idx == 0 and c_idx == 1: ax.set_ylabel("Déplacement (cm)")
+                    if c_idx == 2: ax.set_xlabel("Temps (h)")
+                    if c_idx == 0 and s_idx == 0: ax.legend()
 
+            fig_disp.tight_layout()
 
-# =====================================================================
-# FIGURE 1 : LOG-VRAISEMBLANCE
-# =====================================================================
-fig_llk, axes_llk = plt.subplots(num_chains, 1, figsize=(12, 2.5 * num_chains), sharex=False)
-if num_chains == 1: axes_llk = [axes_llk]
+    print("Terminé ! Affichage des fenêtres.")
+    plt.show()
 
-for idx, (chain_idx, llk_hist) in enumerate(all_llk_histories.items()):
-    ax = axes_llk[idx]
-    ax.plot(np.arange(len(llk_hist)), llk_hist, label=f"Chaîne {chain_idx}", 
-            color=colors[idx], alpha=0.7, marker='.', linestyle='None', markersize=3)
-    ax.grid(True, linestyle=":", alpha=0.6)
-    ax.set_ylabel("LLK")
-    ax.legend(loc="lower right")
-    if idx == 0: ax.set_title("Évolution de la Log-Vraisemblance", fontweight='bold')
-
-fig_llk.tight_layout()
-
-# =====================================================================
-# FIGURE 2 : PARAMÈTRES (MODÈLE INITIAL vs DERNIER MODÈLE PT)
-# =====================================================================
-try:
-    df_true_params = pd.read_csv("model_parameters.csv")
-    true_params_exist = True
-except FileNotFoundError:
-    true_params_exist = False
-
-fig_params, axes_params = plt.subplots(len(models_data), 4, figsize=(16, 3 * len(models_data)), sharex='col')
-if len(models_data) == 1: axes_params = np.expand_dims(axes_params, axis=0)
-param_names = ["k_a_sigma", "b_a", "D_c_inv", "Dtau_asigma"]
-x_faults = np.arange(NSubFaults)
-
-for row_idx, (chain_idx, (mod_init, mod_final)) in enumerate(models_data.items()):
-    for col_idx in range(4):
-        ax = axes_params[row_idx, col_idx]
-        if true_params_exist:
-            ax.plot(x_faults, df_true_params.iloc[:, col_idx+1], label="Init/Cible", color="black", linestyle="None", marker="x", markersize=8)
-        ax.plot(x_faults, mod_final[:, col_idx], label="Dernier PT", color="blue", linestyle="None", marker="o", alpha=0.8)
-        
-        ax.grid(True, linestyle=":", alpha=0.5)
-        if row_idx == 0: ax.set_title(param_names[col_idx], fontweight='bold')
-        if col_idx == 0: ax.set_ylabel(f"Chaîne {chain_idx}")
-        if row_idx == 0 and col_idx == 0: ax.legend(fontsize=8)
-
-fig_params.tight_layout()
-
-# =====================================================================
-# FIGURE 3 : DÉPLACEMENTS (3 SOUS-GRAPHIQUES SÉPARÉS)
-# =====================================================================
-try:
-    df_data = pd.read_csv("surface_responses.csv")
-    df_pred = pd.read_csv("last_model_responses.csv")
-
-    fig_disp, axes_disp = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    components = ["North", "East", "Depth"]
-    titles = ["Nord", "Est", "Profondeur (Vertical)"]
-    
-    for comp_idx, comp in enumerate(components):
-        ax = axes_disp[comp_idx]
-        col_name = f"St1_{comp}" 
-        
-        ax.plot(df_data["Time"], df_data[col_name], label="Cible (Data)", color="black", linestyle="--", linewidth=2, alpha=0.7)
-        ax.plot(df_pred["Time"], df_pred[col_name], label="Prédiction PT", color="red", linewidth=1.5)
-        
-        ax.grid(True, linestyle=":", alpha=0.6)
-        
-        if comp_idx == 0: ax.set_title(f"STATION 1 - {titles[comp_idx]}", fontweight='bold')
-        else: ax.set_title(f"{titles[comp_idx]}")
-        
-        if comp_idx == 1: ax.set_ylabel("Déplacement (cm)")
-        if comp_idx == 2: ax.set_xlabel("Temps (h)")
-        if comp_idx == 0: ax.legend()
-
-    fig_disp.tight_layout()
-except FileNotFoundError:
-    print("\nErreur : Fichiers CSV introuvables (surface_responses ou last_model_responses).")
-
-# =====================================================================
-# FIGURE 4 : TRACE MCMC (ÉVOLUTION DES PARAMÈTRES)
-# =====================================================================
-fig_trace, axes_trace = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
-
-for idx, (chain_idx, history) in enumerate(param_history.items()):
-    steps = np.arange(len(history['k_a_sigma']))
-    for i, p_key in enumerate(param_names):
-        ax = axes_trace[i]
-        ax.plot(steps, history[p_key], label=f"Chaîne {chain_idx}", color=colors[idx], alpha=0.7, linewidth=0.5)
-
-for i, p_key in enumerate(param_names):
-    ax = axes_trace[i]
-    ax.set_ylabel(p_key, fontweight='bold')
-    ax.grid(True, linestyle=":", alpha=0.6)
-    
-    if i == 0:
-        ax.set_title("Trace MCMC : Historique d'exploration des 4 paramètres", fontweight='bold')
-        ax.legend(loc="upper right")
-    if i == 3:
-        ax.set_xlabel("Pas MCMC (Transitions acceptées)")
-
-fig_trace.tight_layout()
-
-plt.show()
+plot_histograms_and_fit()

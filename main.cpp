@@ -20,6 +20,7 @@ int main() {
     Eigen::Matrix<double, 3*Nstations, NSubFaults> G{0.5, 0.4, -0.77};
     
 
+    #pragma region model
     /*
     -----------------------------------------------------------------------------------------------------------------------
                         Compute  surface displacement
@@ -55,14 +56,18 @@ int main() {
                     EXPORT DATA FOR VIZUALISATION
     -------------------------------------------------------------------------------------------------------------------
     */
-   /*
-    // --- Début du bloc d'exportation CSV --- (écrit par une ia j'avais la flemme)
+   
+
     std::ofstream csv_file("surface_responses.csv");
     if (csv_file.is_open()) {
-        // En-tête décrivant chaque colonne
-        csv_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
         
-        // Écriture ligne par ligne (chaque ligne = un pas de temps)
+
+        csv_file << "Time";
+        for (int k = 1; k <= Nstations; ++k) {
+            csv_file << ",St" << k << "_North,St" << k << "_East,St" << k << "_Depth";
+        }
+        csv_file << "\n";
+        
         for (Eigen::Index j = 0; j < RES_matrix.cols(); ++j) {
             csv_file << t_list[j];
             for (Eigen::Index i = 0; i < RES_matrix.rows(); ++i) {
@@ -70,14 +75,12 @@ int main() {
             }
             csv_file << "\n";
         }
+        
         csv_file.close();
-        std::cout << "\nFichier CSV généré avec succès.\n";
+        std::cout << "\nFichier CSV généré avec succès pour " << Nstations << " station(s).\n";
     } else {
         std::cerr << "\nErreur : Impossible de créer le fichier CSV.\n";
     }
-    // --- Fin du bloc d'exportation CSV ---
-    */
-
 
     /*
     -------------------------------------------------------------------------------------------------------------------
@@ -85,116 +88,88 @@ int main() {
     -------------------------------------------------------------------------------------------------------------------
     */
 
-    /*
-    std::ofstream param_file("model_parameters.csv");
-    if (param_file.is_open()) {
-        // En-tête décrivant les colonnes pour chaque sous-faille
-        // (Ajuste les noms de colonnes selon les variables membres exactes de ta classe Param)
-        param_file << "SubFault_Index,k_a_sigma,b_a,D_c_inv,Dtau_asigma\n";
+    std::ofstream param_file2("model_parameters.csv");
+    if (param_file2.is_open()) {
+        param_file2 << "SubFault_Index,k_a_sigma,b_a,D_c_inv,Dtau_asigma,V0_\n";
         
-        // Écriture ligne par ligne (chaque ligne = une sous-faille)
-        for (size_t i = 0; i < pP.size(); ++i) {
-            param_file << i << ","
+        for (size_t i = 0; i < pP.size(); ++i) { 
+            param_file2 << i << ","
                        << pP[i].k_a_sigma << ","
                        << pP[i].b_a << ","
                        << pP[i].D_c_inv << ","
-                       << pP[i].Dtau_asigma << "\n";
+                       << pP[i].Dtau_asigma << ","
+                       << pP[i].V0_ << "\n"; 
         }
-        param_file.close();
-        std::cout << "\nFichier CSV des parametres du modele genere avec succès.\n";
+        param_file2.close();
+        std::cout << "\n Model parameters exported\n";
     } else {
-        std::cerr << "\nErreur : Impossible de creer le fichier CSV des parametres.\n";
+        std::cerr << "\nError : Cannot export model parameters.\n";
     }
-        */
-    
+
 
         /*
     -------------------------------------------------------------------------------------------------------------------
                         PREPARE INVERSION STORAGE
     -------------------------------------------------------------------------------------------------------------------
     */
-
+    #pragma endregion
     
     //PT_param ParametersPT(0, 10.0, 0.1, 3.0, 0.0, 1000.0, 0.0, 20.0, 100.0, 10, 4);
 
     PT_param ParametersPT(
-        0.5, 3.0,    // k_a_sigma : évite le comportement proche de 0
-        0.5, 1.5,    // b_a : limite la forte instabilité
-        0.0, 50.0,   // D_c_inv : MAXIMUM 50 (donc Dc minimum de 2cm), au lieu de 1000 !
-        0.0, 5.0,    // Dtau_asigma : un saut de contrainte modéré
-        10000.0, 8, 1, // T_max descendu à 100.0, nchains=10, ncold=4
-        10000           //burn in steps
+        0.001, 10.0,    // k_a_sigma
+        0.3, 10,    // b_a : 1/10 - 3
+        0.0, 1000.0,   // D_c_inv 
+        0.0, 10.0,    // Dtau_asigma 
+        2000.0, 6, 2,  // T_max descendu à 100.0, nchains=10, ncold=4
+        2000000 //burn-in-steps
     );
 
 
-    auto timeStart = std::chrono::high_resolution_clock::now();
+    double timeStart = omp_get_wtime();
+    std::vector<Param> best_model = parallel_tempering_corrected(10000000, ParametersPT, G, RES_matrix, t_list) ;
 
-    parallel_tempering_corrected(50000, ParametersPT, G, RES_matrix, t_list) ;
+    double timeEnd = omp_get_wtime();
+    double timeTotal = timeEnd - timeStart;
+    std::cout<<"\ntemps total : "<<int(timeTotal)%60<<" min ";
 
-    auto timeEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = timeEnd - timeStart;
-    double timeTotal = duration.count();
-    std::cout<<"temps total : "<<timeTotal;
 
-    
-
+    #pragma region export_best_model
 
     /*
     -------------------------------------------------------------------------------------------------------------------
-                        LECTURE DU .BIN ET EXPORTATION DU DERNIER MODÈLE MCMC
+                        EXPORT BEST MCMC MODEL
     -------------------------------------------------------------------------------------------------------------------
     */
-   /*
-    std::cout << "\nLecture du fichier binaire pour extraire le dernier modele...\n";
-    
-    // Ouverture du binaire à la fin (ate = at end) pour connaitre sa taille globale
-    std::ifstream bin_file("chain_cold_0.bin", std::ios::binary | std::ios::ate);
-    
-    if (bin_file.is_open()) {
-        std::streamsize file_size = bin_file.tellg();
-        size_t step_size = sizeof(double) + (NSubFaults * sizeof(Param));
+
+    surface_response(best_model, t_list, Faille, G, RES_matrix, storage_matrix);
+
+    std::ofstream pred_file("best_results.csv"); 
+    if (pred_file.is_open()) {
         
-        if (file_size >= step_size) {
-            // On se place exactement au début de la toute dernière sauvegarde
-            bin_file.seekg(file_size - step_size, std::ios::beg);
-            
-            // 1. Lecture de la LLK
-            double best_llk;
-            bin_file.read(reinterpret_cast<char*>(&best_llk), sizeof(double));
-            
-            // 2. Lecture des paramètres
-            std::vector<Param> best_model(NSubFaults);
-            bin_file.read(reinterpret_cast<char*>(best_model.data()), NSubFaults * sizeof(Param));
-            
-            std::cout << "Dernier modele extrait (LLK = " << best_llk << "). Calcul de la reponse...\n";
-            
-            // 3. Calcul de la réponse de surface
-            Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> PRED_matrix(3*Nstations, t_list.size());
-            
-            // On réutilise Faille, G, storage_matrix et t_list qui sont déjà dans ton main
-            surface_response(best_model, t_list, Faille, G, PRED_matrix, storage_matrix);
-            
-            // 4. Exportation dans un nouveau CSV
-            std::ofstream pred_file("last_model_responses.csv");
-            if (pred_file.is_open()) {
-                pred_file << "Time,St1_North,St1_East,St1_Depth,St2_North,St2_East,St2_Depth\n";
-                for (Eigen::Index j = 0; j < PRED_matrix.cols(); ++j) {
-                    pred_file << t_list[j];
-                    for (Eigen::Index i = 0; i < PRED_matrix.rows(); ++i) {
-                        pred_file << "," << PRED_matrix(i, j);
-                    }
-                    pred_file << "\n";
-                }
-                pred_file.close();
-                std::cout << "Fichier 'last_model_responses.csv' genere avec succes.\n";
-            } else {
-                std::cerr << "Erreur : Impossible de creer last_model_responses.csv\n";
-            }
+        pred_file << "Time";
+        for (int k = 1; k <= Nstations; ++k) {
+            pred_file << ",St" << k << "_North,St" << k << "_East,St" << k << "_Depth";
         }
-        bin_file.close();
+        pred_file << "\n";
+
+        for (Eigen::Index j = 0; j < RES_matrix.cols(); ++j) {
+            pred_file << t_list[j];
+            for (Eigen::Index i = 0; i < RES_matrix.rows(); ++i) {
+                pred_file << "," << RES_matrix(i, j);
+            }
+            pred_file << "\n";
+        }
+        pred_file.close();
+        std::cout << "\n File with best model generated \n";
+        
     } else {
-        std::cerr << "Erreur : Impossible d'ouvrir chain_cold_0.bin\n";
+        std::cerr << "Error : Cannot creat bestmodelfile\n";
     }
-    */
+
+    #pragma endregion
+    
+    
+    
     return 0;
 }
