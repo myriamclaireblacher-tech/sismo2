@@ -1,6 +1,7 @@
 # Ignorer le dossier de compilation locale et ses fichiers temporaires
 build/
 CMakeFiles/
+résultats/
 CMakeCache.txt
 cmake_install.cmake
 Makefile

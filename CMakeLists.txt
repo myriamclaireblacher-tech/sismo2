@@ -20,16 +20,16 @@ find_package(OpenMP REQUIRED)
 # 2. CONFIGURATION DES SOURCES
 set(SOURCES
     main.cpp
-    ODE.cpp
-    inversion.cpp
+    solver/ODE.cpp
+    solver/inversion.cpp
 )
 
 set(HEADERS
-    ODE.hpp
-    variables.hpp
-    param.hpp
-    Surface_response.hpp
-    inversion.hpp
+    solver/ODE.hpp
+    solver/variables.hpp
+    solver/param.hpp
+    solver/Surface_response.hpp
+    solver/inversion.hpp
 )
 
 # 3. RECHERCHE DE SUNDIALS
@@ -39,7 +39,7 @@ find_package(SUNDIALS REQUIRED COMPONENTS cvode nvecserial)
 add_executable(sismo2 ${SOURCES} ${HEADERS})
 
 # 5. INCLUSIONS ET LIENS
-target_include_directories(sismo2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(sismo2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/solver)
 target_link_libraries(sismo2 PUBLIC SUNDIALS::cvode SUNDIALS::nvecserial)
 
 # Lier Eigen à votre exécutable (Corrigé pour cibler sismo2 après sa création)

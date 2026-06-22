@@ -10,38 +10,17 @@
 
 int main() {
 
-    //visualiser avec viz2.py
-    //Corriger adresse de G
-
-    //1 sous faille, 12 station randoms 
-
-    #pragma region model
+    //1 sous faille, 1 station, G choisi random
     /*
     -----------------------------------------------------------------------------------------------------------------------
                         EXTRACT GREEN MATRIX
     -----------------------------------------------------------------------------------------------------------------------
     */
-    Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
-    //adresse de G
-    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_2x2subfault_12statsions.txt");
-    if (!file.is_open()) {
-        std::cerr << "Error : Open file." << std::endl;
-        return 1;
-    }
-
-    for (int i = 0; i < G.rows(); ++i) {
-            for (int j = 0; j < G.cols(); ++j) {
-                if (!(file >> G(i, j))) {
-                    std::cerr << "Error : not enough data." << std::endl;
-                    return 1;
-                }
-            }
-        }
-    file.close();
-
-    std::cout<<"done \n";
-
+    std::cout<<"extract G : " ;
+    Eigen::Matrix<double, 3*Nstations, NSubFaults> G{0.5, 0.4, -0.77};
     
+
+    #pragma region model
     /*
     -----------------------------------------------------------------------------------------------------------------------
                         Compute  surface displacement
@@ -142,13 +121,13 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 1000.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        20000.0, 6, 1,  // T_max descendu à 100.0, nchains=10, ncold=4
-        200000 //burn-in-steps
+        2000.0, 6, 2,  // T_max descendu à 100.0, nchains=10, ncold=4
+        2000000 //burn-in-steps
     );
 
 
     double timeStart = omp_get_wtime();
-    std::vector<Param> best_model = parallel_tempering_2sf(700000, ParametersPT, G, RES_matrix, t_list, 42, true) ;
+    std::vector<Param> best_model = parallel_tempering_corrected(10000000, ParametersPT, G, RES_matrix, t_list) ;
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;

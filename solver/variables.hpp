@@ -7,10 +7,10 @@ constexpr bool rapport_EDO = false ;
 
 
 //constexpr int Nstations = 2 ;
-constexpr int Nstations = 1 ;
+constexpr int Nstations = 12 ;
 
 //constexpr int NSubFaults = 450 ;
-constexpr int NSubFaults = 1 ;
+constexpr int NSubFaults = 2 ;
 
 constexpr int NCPU = 6 ;
                     //6

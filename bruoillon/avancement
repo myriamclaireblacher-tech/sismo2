@@ -1,0 +1,17 @@
+Explications du problème
+
+1. Résolution d'EDO : prise en main d'un nouvel outil, en C++. Problème compliqué et algorithme lent donc stratégies de calcul HPC. 
+Créations de classes
+
+2. Convolution par une matrice de green. Explication du problème et implémentation (moentrer figure).
+
+3. Prise en main d'un algo de résolution numérique : McMc. Prise en main sur un problème simple. Stratégie de proposition de 
+déplacement etc. 
+
+4. Application au problème direct simple + convolution avec 12 stations (plus rapides). Stratégie de sigma adaptatif 
+car si trop grand n'explore pas assez les bons param, si trop petit bouge très lentement (McMc adaptatifs). 
+(voir res et nouveau param). Ajustement de la température (selon courbe de la llk max).
+
+5. Problème à 2 sous failles (12 stations, fixes). Si marche aléatoire avec peu de paramètres, taux d'acceptation de nouveaux 
+modèles crashent et sigma (le pas devient trop petit). Sinon, plus grande acceptation de modèles. Ajustement des params.
+Ajout d'un décompte P(Geom<100)=0.5
