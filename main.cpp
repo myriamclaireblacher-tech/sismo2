@@ -142,13 +142,13 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 1000.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        20000.0, 6, 1,  // T_max descendu à 100.0, nchains=10, ncold=4
-        200000 //burn-in-steps
+        40000.0, 12, 1,  // T_max descendu à 100.0, nchains=10, ncold=4
+        500000 //burn-in-steps
     );
 
 
     double timeStart = omp_get_wtime();
-    std::vector<Param> best_model = parallel_tempering_2sf(700000, ParametersPT, G, RES_matrix, t_list, 42, true) ;
+    std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, true) ;
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;

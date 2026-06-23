@@ -545,7 +545,9 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     std::uniform_real_distribution<double> unif_dist(0.0 , 1.0); 
     for (int i=0;i<PT.nchains;i++){
         if (i<PT.ncold) T[i]=1.0 ;
-        else T[i]= std :: exp( (i-PT.ncold+1)*1.0/(PT.nchains-PT.ncold) * std::log(PT.T_max) ) ; ///////////////////////:
+        //loi de puissance
+        else if ((i<6) && (i<PT.nchains)) T[i]= std :: exp( std::pow((i-PT.ncold+1)*1.0/(7-PT.ncold),1.3) * std::log(1000) ) ; ///////////////////////:
+        else T[i]= 1000 + (PT.T_max- 1000)*(i-6)/(PT.nchains-1-6) ;
         std::cout<< "\nT["<<i<<"] : "<<T[i];
     }
     
@@ -594,6 +596,10 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     std::vector<int> accepts_chain(PT.nchains, 0);
     const int adapt_window = 200; // Evaluation every 200 steps
 
+    //last modified subfault
+    std::vector<int> sfindex(PT.nchains, 0);
+
+    double geometric_proba = 1.0 - std::exp(std::log(0.5)/1) ;
 
     #pragma omp parallel 
     {
@@ -702,7 +708,10 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
                 double prop;
                 double k_a_sigma;
 
-                int i = random_index(gen2) ;
+                double p = unif_dist_intern(gen2);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) {sfindex[ichain]=1-sfindex[ichain]; i =sfindex[ichain];}
+
                 
                 prop = unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigmas[ichain];
                 if (prop + work.pP[i].k_a_sigma > PT.k_a_sigma_sup)   k_a_sigma = 2 * PT.k_a_sigma_sup - work.pP[i].k_a_sigma - prop ; 

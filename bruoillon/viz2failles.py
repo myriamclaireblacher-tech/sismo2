@@ -45,7 +45,7 @@ def plot_all_results():
     # ==========================================================
     # 1. TRACES TEMPORELLES (SÉRIES MCMC + LLK)
     # ==========================================================
-    
+    """
     if viz1:
         # On crée une figure 6 lignes x 2 colonnes (une colonne par sous-faille)
         fig_trace, axes_trace = plt.subplots(6, 2, figsize=(16, 14), sharex=True)
@@ -94,7 +94,7 @@ def plot_all_results():
             
         fig_trace.tight_layout()
         
-
+    """
     # ==========================================================
     # 2. CORNER PLOT (1 FIGURE DISTINCTE PAR SOUS-FAILLE)
     # ==========================================================

@@ -14,4 +14,17 @@ car si trop grand n'explore pas assez les bons param, si trop petit bouge très 
 
 5. Problème à 2 sous failles (12 stations, fixes). Si marche aléatoire avec peu de paramètres, taux d'acceptation de nouveaux 
 modèles crashent et sigma (le pas devient trop petit). Sinon, plus grande acceptation de modèles. Ajustement des params.
-Ajout d'un décompte P(Geom<100)=0.5
+Ajout d'un décompte P(Geom<100)=0.5 Non trop lent. Changement toutes les itérations beaucoup plus rapides. 
+Augmentation du nombre de chains (*2, même Tmax (ou même ordre de grandeur)) => plus rapide. (tests à faire avec plus de seed) 
+
+Changement de stratégies pour les chaines froides Référence : Gregory, P. C. (2005). Bayesian Logical Data Analysis for the Physical Sciences. 
+Cambridge University Press. Ce qu'il explique : Phil Gregory est l'un des pionniers de l'utilisation du Parallel Tempering pour l'inversion 
+de données physiques complexes (hautement non-linéaires et multi-modales). Dans ses travaux, il montre que la distribution 
+géométrique standard isole thermiquement la chaîne froide. Il y conceptualise l'utilisation de grilles de température 
+modifiées (de type puissance) pour forcer le couplage des chaînes près de la distribution cible.
+
+Changeent de distribution de température.
+
+
+Test à faire : Covariance entre paramètres? (moyenne (X-E[X])*(Y-E[Y]))
+Coviariance due à sigma?
