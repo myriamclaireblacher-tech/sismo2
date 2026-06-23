@@ -535,6 +535,10 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
     int accept_count = 0;
     int crash_count = 0;
+    std::vector<int> crash_count_temp (PT.nchains, 0) ;
+    std::vector<int> swap_rate (PT.nchains, 0) ;
+    std::vector<int> swap_try (PT.nchains, 0) ;
+    std::vector<bool> crashtest (PT.nchains, false) ; 
 
     //check size
     if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
@@ -546,8 +550,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     for (int i=0;i<PT.nchains;i++){
         if (i<PT.ncold) T[i]=1.0 ;
         //loi de puissance
-        else if ((i<6) && (i<PT.nchains)) T[i]= std :: exp( std::pow((i-PT.ncold+1)*1.0/(7-PT.ncold),1.3) * std::log(1000) ) ; ///////////////////////:
-        else T[i]= 1000 + (PT.T_max- 1000)*(i-6)/(PT.nchains-1-6) ;
+        else T[i]= std :: exp( std::pow((i-PT.ncold+1)*1.0/(PT.nchains-PT.ncold),2.0) * std::log(PT.T_max) ) ; ///////////////////////:
         std::cout<< "\nT["<<i<<"] : "<<T[i];
     }
     
@@ -643,6 +646,9 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
 
         }
+
+        #pragma omp single
+        {std::cout<<" llk initiale :"<<llk[0];}
         
         
         //begin parallel tempering
@@ -657,42 +663,57 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
             #pragma omp single
             {
+
                 if (it > 0 && (it % 50000 == 0) ) {
-                    std::cout << std::setw(3) << (100 * it / maxint) << "% done | "
-                              << "\nChain 0 -> Accept : " << 100*accepts_chain[0]/adapt_window<<" % |   sigma : "<<sigmas[0]
-                              << "  \nChain 1 -> Accept: " << 100*accepts_chain[1]/adapt_window<<" % |   sigma : "<<sigmas[1]
-                              << "  \nChain 2 -> Accept: " << 100*accepts_chain[2]/adapt_window<<" % |   sigma : "<<sigmas[2]
-                              << "  \nChain 3 -> Accept: " << 100*accepts_chain[3]/adapt_window<<" % |   sigma : "<<sigmas[3]
-                              << "  \nChain 4 -> Accept: " << 100*accepts_chain[4]/adapt_window<<" % |   sigma : "<<sigmas[4]
-                              << "  \nChain 5 -> Accept: " << 100*accepts_chain[5]/adapt_window<<" % |   sigma : "<<sigmas[5]
-                              << "  \nCrash EDO: " << crash_count <<" / "<< maxint / 10 
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+                    for (int c = 0; c < PT.nchains; c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : " << sigmas[c] 
+                                  << " |  T : " << T[c] ;
+
+                    if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout<< "  \nCrash EDO: " << crash_count <<" / "<< maxint / 10 
                               << "  \nLast llk: " << llk[0] << std::endl;
                     
                     // Remise à zéro pour la prochaine tranche de 10%
-    
+                    
                     crash_count = 0;
                 }
 
                 //update sigma
                 if (it > 0 && it % adapt_window == 0) {
+                     
                     
                     // On adapte uniquement si on est dans la période de Burn-in
                     if (it < PT.burn_in_steps) {
                         for (int c = 0; c < PT.nchains; c++) {
+                            //sigma
+                            crashtest[c] = (crash_count_temp[c]==0) ;
                             double acc_rate = (double)accepts_chain[c] / adapt_window;
                             
-                            if (acc_rate < 0.20) {
-                                sigmas[c] *= 0.9; 
-                            } else if (acc_rate > 0.30) {
-                                sigmas[c] *= 1.1; 
-                            }
+                            if ((acc_rate < 0.20 )&&(sigmas[c]>1e-7)) {
+                                sigmas[c] *= 0.9 ;
+                            } else if ((acc_rate > 0.30) &&(sigmas[c]<0.05)&& (crashtest[c]) )  sigmas[c] *= 1.1; 
+                            
+
+                            //Temp
+                            if (swap_try[c]!=0){
+                            if ((swap_rate[c]*1.0/swap_try[c]<0.2) && (crashtest[c]) ) T[c]=T[c]*1.1;
+                            else if ((swap_rate[c]*1.0/swap_try[c]>0.3) && (crashtest[c])) {double prop= 0.9*T[c] ; if (prop>1)  {T[c] = ;}}}
+                            crash_count_temp[c]=0 ;
+                            swap_rate[c]=0 ;
+                            swap_try[c]=0;
                         }
+
+
                     }
                     
                     // Remise à zéro des compteurs pour la prochaine fenêtre de 200 pas
                     for (int c = 0; c < PT.nchains; c++) {
                         accepts_chain[c] = 0; 
                     }
+
                 }
             }
             //update Markow chains
@@ -710,7 +731,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
                 double p = unif_dist_intern(gen2);
                 int i = sfindex[ichain] ;
-                if (p<geometric_proba) {sfindex[ichain]=1-sfindex[ichain]; i =sfindex[ichain];}
+                if (p<geometric_proba) {sfindex[ichain]=random_index(gen2); i =sfindex[ichain];}
 
                 
                 prop = unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigmas[ichain];
@@ -755,11 +776,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
 
 
-                if (ichain == 0) {
-                    if (Enew <= -9e4) {
-                        #pragma omp atomic
-                        crash_count++;
-                    }
+                crash_count_temp[ichain]++;
                 
                 }
 
@@ -788,8 +805,12 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
                     // Formule théorique du Parallel Tempering
                     double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
                     double u_swap     = std::log(unif_dist(gen));
+                    swap_try[p]++;
+                    swap_try[q]++;
 
                     if (u_swap <= alpha_swap) {
+                        swap_rate[p]++;
+                        swap_rate[q]++;
                         std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
                         std::swap(llk[p], llk[q]);
                     }
@@ -840,7 +861,7 @@ double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
     int SR = surface_response(work.pP, t_list, work.fault, G, work.RES_matrix, work.storage_matrix);
-    if (SR!=0) return -1e6f;
+    if (SR!=0) return -1e9f;
     double llk = - (data - work.RES_matrix).array().square().sum();
     return llk;
 }

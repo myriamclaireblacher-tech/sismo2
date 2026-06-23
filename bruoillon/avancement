@@ -23,7 +23,10 @@ de données physiques complexes (hautement non-linéaires et multi-modales). Dan
 géométrique standard isole thermiquement la chaîne froide. Il y conceptualise l'utilisation de grilles de température 
 modifiées (de type puissance) pour forcer le couplage des chaînes près de la distribution cible.
 
-Changeent de distribution de température.
+ChangeMent de distribution de température.
+Changer Dc inv
+Rajouter températures automatiques
+recherche de minimum : stations à erreurs élevées : side etc
 
 
 Test à faire : Covariance entre paramètres? (moyenne (X-E[X])*(Y-E[Y]))
