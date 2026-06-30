@@ -66,7 +66,7 @@ int main() {
 
 
     for (int i=0; i<NSubFaults ; i++){
-            pP.emplace_back(0.01, 0.4, 0.17, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0);
+            pP.emplace_back(0.01, 0.4, 0.17-0.001*i, 0.1, 0.08 * 100.0 / (365.0 * 24.0), 2.0+0.01*i);
         }
 
     surface_response(pP,  t_list, Faille , G, RES_matrix,  storage_matrix);
