@@ -15,6 +15,7 @@ class Param{
         double b_a;                 //b sigma / (a simag)
         double D_c_inv;             // 1/D_c
         double Dtau_asigma;     //Delta Tau/ (a sigma) 
+        
         double coeff1;          //2.0 * (- k/ (a sigma) +  b sigma / (a simag) /D_c )
         double coeff2;          //Vinf * k/ (a sigma) 
 

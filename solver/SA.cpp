@@ -1,10 +1,12 @@
+#include "inversion.hpp"
 #include <algorithm>
 
 
-void SA (int niter, const std::vector<sunrealtype>& t_list,  const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, c
-    onst Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
-      int npert  = 20, double T = 0.01){
+void SA (int niter, int npert,  const std::vector<sunrealtype>& t_list,  const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, 
+    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, PT_param PT,
+      int npert  = 20, double T = 0.01, double seed= 3456789){
 
+    #pragma region initialisation
     double alp    = (0.000004/0.01) ** (1.0/niter) ;
     const double nparam = 5 ;
 
@@ -19,10 +21,11 @@ void SA (int niter, const std::vector<sunrealtype>& t_list,  const  Eigen::Matri
     double p4 = (PT.Dtau_asigma_inf + PT.Dtau_asigma_sup) / 2.0;
     double p5 = (PT.V0_inf + PT.V0_sup) /2.0 ;
 
-    work.pP = Param(p1, p2, p3 , p4 , p5);
+    for (int j=0; j<NSubFaults ; j++) work.pP[j] = Param(p1, p2, p3 , p4 , p5);
 
     //best llk & params
-    double best_llk=compute_llk2(t_list, data, G, work) ;
+    double llk=compute_llk2(t_list, data, G, work) ;
+    double best_llk=llk ;
 
     std::vector<Param> best_param;
     best_param.resize(NSubFaults);
@@ -41,52 +44,88 @@ void SA (int niter, const std::vector<sunrealtype>& t_list,  const  Eigen::Matri
     std::random_device rd;
     std::default_random_engine rng(rd());
 
-    for (int it=0; i<niter ; i++){
-        double p = unif_dist(gen);
-        if (p<geometric_proba) {i=random_index(gen);}
-        int num_param = random_param ;
+    #pragma endregion
 
+    for (int it=0; i<niter ; i++){
+
+        double p = unif_dist(gen);
+
+        //if (p<geometric_proba) {i=random_index(gen);}
+
+        std::vector <int> num_sf (NSubFaults);
+        for (int j=0; j< NSubFaults; j++) num_sf[j]=j;
+        std::shuffle(num_sf.begin(), num_sf.end(), rng);
         std::vector <int> num_param = {0, 1, 2, 3 , 4};
         std::shuffle(num_param.begin(), num_param.end(), rng);
 
+        for (int id_sf; id_sf<NSubFaults; id_sf++){
+        
+        double *pm1= &work.pP[id_sf].k_a_sigma ;
+        double *pm2= &work.pP[id_sf].b_a ;
+        double *pm3= &work.pP[id_sf].D_c_inv ;
+        double *pm4= &work.pP[id_sf].Dtau_asigma ;
+        double *pm5= &work.pP[id_sf].V0_ ;
+
+
         for (int j=0; j<nparam ; j++){
-            double alpha = unif_dist(gen);
-            // -> Perturbation distance 
-            double y = T * std::tan(std::pi * (alpha - 0.5)) ;
-            // direction
-            double v = unif_dist_plus(gen) ;
-            v= v/std::abs(v);
+
+            double * old_param =-1;
+            double ub = -1 ;
+            double lb = - 1 ;
+
+            #pragma region param_choice
+            if (num_param[j]==0) 
+                {old_param = &work.pP[num_sf[id_sf]].k_a_sigma;
+                ub = PT.k_a_sigma_sup;
+                lb = PT.k_a_sigma_inf ;}
+            else if (num_param[j]==1) 
+                {old_param = &work.pP[num_sf[id_sf]].b_a ;
+                ub = PT.b_a_sup ;
+                lb = PT.b_a_inf ;}
+            else if (num_param[j] ==2) 
+                {old_param = &work.pP[num_sf[id_sf]].D_c_inv ;
+                ub = PT.D_c_inv_sup ;
+                lb = PT.D_c_inv_inf ;}
+            else if (num_param[j] == 3) 
+                {old_param = &work.pP[num_sf[id_sf]].V0_ ;
+                ub = PT.V0_sup ;
+                lb = PT.V0_inf ;}
+                    
+            else if (num_param[j] == 4 ) 
+                {old_param = & work.pP[num_sf[id_sf]].Dtau_asigma ;
+                ub = PT.Dtau_asigma_sup ;
+                lb =PT.Dtau_asigma_inf ;}
+
+            #pragma endregion
+            
 
             for (int ipert=0; i<npert; i++){
+                double P_new ;
+                do {double alpha = unif_dist(gen);
+                // -> Perturbation distance 
+                double y = T * std::tan(std::pi * (alpha - 0.5)) ;
+                // direction
+                double v = unif_dist_plus(gen) ;
+                v= v/std::abs(v);
                 //new model
-                m_new[isub, ipm] = m[isub, ipm] + y[ipert] * v[ipert] * (ubounds[ipm] - lbounds[ipm])
-                //within bounds
+                P_new =  old_param + y * v* (ub - lb) ; }
 
-                 while m_new[isub, ipm] > ubounds[ipm] or m_new[isub, ipm] < lbounds[ipm]:
+                while ((P_new> ub)|| (P_new<lb) )
 
-                    # -> New amplitude of the perturbation
-                    alpha[ipert] = np.random.uniform(0.0, 1.0)
+                 &(*old_param) = P_new ;
 
-                    # -> New perturbation distance
-                    y[ipert] = T * np.tan(np.pi * (alpha[ipert] - 0.5))
 
-                    # -> New new model
-                    m_new[isub, ipm] = m[isub, ipm] + y[ipert] * v[ipert] * (ubounds[ipm] - lbounds[ipm])
-
-                # -> Compute the predictions
-                pred = forward.calc_pred(m_new, t, vl, G)
-
-                # -> Compute the cost-function
-                err_new[ipert] = forward.calc_cost(obs, pred)
+                work.pP = Param(*pm1, *pm2, *pm3 , *pm4 , *pm5);
+                llk =compute_llk3(id_sf, t_list, data, G, work, work.storage_matrix) ;
+                if (llk>best_llk) best_llk=llk ;
                 
             }
         }
-        if (num_param==0) ka
-        else if (num_param==1) as
-        else if (num_param ==2) ba
-        else if (num_param == 3) V0
-        else if (num_param == 4 )
     }
+    T * alp ;
+
+    std::cout << "\niteration = "<<it<< "/ cost = "<<llk<< " / cost min. = "<<best_llk ;
+}
 
 
 
