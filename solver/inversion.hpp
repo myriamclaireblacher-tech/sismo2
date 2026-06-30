@@ -50,11 +50,15 @@ std::vector<Param> parallel_tempering_corrected(const int maxint,  const PT_para
 */
 std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT,  const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype> & t_list, const int seed, bool hotchains );
 
+std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT,  const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype> & t_list, const int seed, bool hotchains );
+
 double pi(const Param & P, const std::vector<sunrealtype> & t_list, const Eigen::Ref<Eigen::RowVectorXd> & data, Fault & F, Eigen::Ref<Eigen::RowVectorXd> & slip_list);
 
 double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work);
 
+double compute_llk3(int subfault, const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work, Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix);
 /*
 double compute_llk(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work) ;

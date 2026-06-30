@@ -142,7 +142,7 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 100.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        10000.0, 80, 20,  // T_max descendu à 100.0, nchains=10, ncold=4
+        10000.0, 30, 30/4,  // T_max descendu à 100.0, nchains=10, ncold=4
         500000 //burn-in-steps
     );
 

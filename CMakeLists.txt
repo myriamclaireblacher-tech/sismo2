@@ -22,6 +22,7 @@ set(SOURCES
     main.cpp
     solver/ODE.cpp
     solver/inversion.cpp
+    solver/Surface_response.cpp
 )
 
 set(HEADERS

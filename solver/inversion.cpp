@@ -581,7 +581,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     }}
 
 
-    double best_llk=-10e8f;
+    double best_llk=-1e9f;
     std::vector<Param> best_param;
     best_param.resize(NSubFaults);
     int best_it;
@@ -595,6 +595,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     for (int t = 0; t < NCPU; ++t) {
         workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
     }
+
 
     //sigma
     std::vector<double> sigmas(PT.nchains, 0.01);
@@ -629,9 +630,9 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
             
             for (int i = 0; i < NSubFaults; i++) {
                 // Centre exact des bornes
-                double p1 = (PT.k_a_sigma_inf + PT.k_a_sigma_sup) / 2.0;
-                double p2 = (PT.b_a_inf + PT.b_a_sup) / 2.0;
-                double p3 = (PT.D_c_inv_inf + PT.D_c_inv_sup) / 2.0;
+                double p1 = (PT.k_a_sigma_inf + PT.k_a_sigma_sup) / 10.0;
+                double p2 = (PT.b_a_inf + PT.b_a_sup) / 10.0;
+                double p3 = (PT.D_c_inv_inf + PT.D_c_inv_sup) / 20.0;
                 double p4 = (PT.Dtau_asigma_inf + PT.Dtau_asigma_sup) / 2.0;
                 double p5 = (PT.V0_inf + PT.V0_sup) /2.0 ;
 
@@ -674,11 +675,11 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
             {
                 #pragma region affichage
 
-                if (it > 0 && (it % 3000 == 0) ) {
+                if (it > 0 && (it % 25000 == 0) ) {
                     std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
                     for (int c = 0; c < std::min(PT.nchains,6); c++) {
                         std::cout << "\nChain " << c 
-                                  << " -> Accept : " << 100 * accepts_chain[c] / adapt_window << " %"
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
                                   << " |  sigma : " << sigmas[c] 
                                   << " |  T : " << T[c] ;}
 
@@ -705,7 +706,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
                             double acc_rate = (double)accepts_chain[c] / adapt_window;
                             
                             if (it < PT.burn_in_steps/2){
-                                if ((acc_rate < 0.20 ) && (sigmas[c]>0.01)) {
+                                if ((acc_rate < 0.20 ) && (sigmas[c]>0.005)) {
                                 sigmas[c] *= 0.9 ;
                                 } else if ((acc_rate > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; 
                                 
@@ -731,12 +732,13 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
                         }
 
 
-                    }
+                    
                     
                     // Remise à zéro des compteurs pour la prochaine fenêtre de 200 pas
                     for (int c = 0; c < PT.nchains; c++) {
                         accepts_chain[c] = 0; 
                     }
+                }
 
                 }
 
@@ -878,6 +880,361 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     }
 
 
+std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT,  const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype> & t_list, const int seed, bool hotchains )
+                                    {
+
+    #pragma region initialisation
+    int accept_count = 0;
+    int crash_count = 0;
+    std::vector<int> crash_count_temp (PT.nchains, 0) ;
+    std::vector<int> swap_rate (PT.nchains, 0) ;
+    std::vector<int> swap_try (PT.nchains, 0) ;
+    std::vector<bool> crashtest (PT.nchains, false) ; 
+
+    //check size
+    if (t_list.size()!=static_cast<size_t>(data.cols())) std::cout<<"\nt_list and data size are not matching \n";
+
+    
+    
+    //Temperatures
+    std::mt19937 gen(seed); 
+    std::vector<double> T(PT.nchains); 
+    std::uniform_real_distribution<double> unif_dist(0.0 , 1.0); 
+    for (int i=0;i<PT.nchains;i++){
+        if (i<PT.ncold) T[i]=1.0 ;
+        //loi de puissance
+        else T[i]= std :: exp( std::pow((i-PT.ncold+1)*1.0/(PT.nchains-PT.ncold),2.0) * std::log(PT.T_max) ) ; ///////////////////////:
+        std::cout<< "\nT["<<i<<"] : "<<T[i];
+    }
+    
+    //rand\om interger
+    std::uniform_int_distribution<int> rand_chain(0, PT.nchains - 1); 
+
+    //likelihood data storage
+    std::vector<double> llk ;
+    llk.resize(PT.nchains);
+
+    //model storage
+    std::vector<Param> P;
+    P.resize(PT.nchains);
+
+    //store the models of the cold chains
+    
+    std::vector<ColdChainSaver> savers;
+    if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
+        savers.emplace_back(i);
+    }}
+    else{
+    for (int i = 0; i < PT.ncold; ++i) {
+        savers.emplace_back(i);
+    }}
+
+
+    double best_llk=-1e9f;
+    std::vector<Param> best_param;
+    best_param.resize(NSubFaults);
+    int best_it;
+
+    //Initial models of the chains    
+    std::vector<Param> M;
+    M.resize(PT.nchains*NSubFaults);
+
+    //Create storage space for each CPU
+    std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
+    for (int t = 0; t < NCPU; ++t) {
+        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+    }
+
+    std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (PT.nchains);
+
+
+    //sigma
+    std::vector<double> sigmas(PT.nchains, 0.01);
+    
+    // count accept rate for each chain
+    std::vector<int> accepts_chain(PT.nchains, 0);
+    const int adapt_window = 200; // Evaluation every 200 steps
+
+    //last modified subfault
+    std::vector<int> sfindex(PT.nchains, 0);
+
+    double geometric_proba = 1.0 - std::exp(std::log(0.5)/1) ;
+
+    #pragma endregion 
+
+    
+    #pragma omp parallel 
+    {
+        #pragma region initial_model
+        std::mt19937 gen2(seed+omp_get_thread_num());
+        std::uniform_real_distribution<double> unif_dist_plus(-1.0 , 1.0);//////////////////////////////////////
+        /////////////////////////////////
+        std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0);
+        std::uniform_int_distribution<int> random_index(0, NSubFaults-1); 
+        ThreadWorkspace& work = *workspaces[omp_get_thread_num()]; 
+
+
+        //initial models
+        #pragma omp for schedule(dynamic)
+        for (int j=0;j<PT.nchains;j++){
+            double llk_i ;
+            //propose new model 
+            
+            for (int i = 0; i < NSubFaults; i++) {
+                // Centre exact des bornes
+                double p1 = (PT.k_a_sigma_inf + PT.k_a_sigma_sup) / 10.0;
+                double p2 = (PT.b_a_inf + PT.b_a_sup) / 10.0;
+                double p3 = (PT.D_c_inv_inf + PT.D_c_inv_sup) / 20.0;
+                double p4 = (PT.Dtau_asigma_inf + PT.Dtau_asigma_sup) / 2.0;
+                double p5 = (PT.V0_inf + PT.V0_sup) /2.0 ;
+
+                
+
+                M[j * NSubFaults + i] = Param(p1, p2, p3 , p4 , p5);
+            }
+            
+            //test llk
+            work.pP.assign(M.begin() + (j * NSubFaults), 
+                           M.begin() + ((j + 1) * NSubFaults));
+            llk_i = compute_llk2(t_list, data, G , work);
+            storage_matrixes[j]=work.storage_matrix ;
+            llk[j]=llk_i;
+            if (hotchains)
+            {
+               savers[j].save_step(work.pP, llk_i);
+            }
+            else {if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);}
+
+
+        }
+
+        std::cout<<"\n";
+
+        #pragma omp single
+        {std::cout<<" llk initiale :"<<llk[0];}
+
+        #pragma endregion
+        
+        
+        //begin parallel tempering
+
+        for (int it = 0; it < maxint ; it ++ ){
+
+            #pragma omp single
+            {
+            if (it % (maxint / 10) == 0) {
+                std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+            }}  
+
+            #pragma omp single
+            {
+                #pragma region affichage
+
+                if (it > 0 && (it % 25000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(PT.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : " << sigmas[c] 
+                                  << " |  T : " << T[c] ;}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout<< "  \nCrash EDO: " << crash_count <<" / "<< maxint / 10 
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                    // Remise à zéro pour la prochaine tranche de 10%
+                    
+                    crash_count = 0;
+                }
+                #pragma endregion
+
+                //update sigma
+                #pragma region adaptation
+                if (it > 0 && it % adapt_window == 0) {
+                     
+                    
+                    // On adapte uniquement si on est dans la période de Burn-in
+                    if (it < PT.burn_in_steps) {
+                        for (int c = 0; c < PT.nchains; c++) {
+                            //sigma
+                            crashtest[c] = (crash_count_temp[c]==0) ;
+                            double acc_rate = (double)accepts_chain[c] / adapt_window;
+                            
+                            if (it < PT.burn_in_steps/2){
+                                if ((acc_rate < 0.20 ) && (sigmas[c]>0.005)) {
+                                sigmas[c] *= 0.9 ;
+                                } else if ((acc_rate > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; 
+                                
+                            }
+                            else
+                                {if ((acc_rate < 0.20 )&&(sigmas[c]>1e-7)) {
+                                sigmas[c] *= 0.9 ;
+                                } else if ((acc_rate > 0.30) &&(sigmas[c]<0.05)&& (crashtest[c]) )  sigmas[c] *= 1.1; }
+                            crash_count_temp[c]=0 ;}
+                            
+                            
+                            /*
+                            //Temp
+                            if (it % (adapt_window*100) == 0){
+                            if ((swap_try[c]!=0) && (c>=PT.ncold-1)){
+                                if ((swap_rate[c]*1.0/swap_try[c]<0.2) && (crashtest[c]) && (c<PT.nchains-2)) T[c+1]=T[c]+0.9 *(T[c+1]-T[c]);
+                                else if ((swap_rate[c]*1.0/swap_try[c]>0.3) && (crashtest[c]) && (c<PT.nchains-2)) 
+                                     T[c+1] = T[c+1]+0.1*(T[c+2]-T[c+1]) ;}
+                            
+                            swap_rate[c]=0 ;
+                            swap_try[c]=0;}
+                            */
+                        }
+
+
+                    
+                    
+                    // Remise à zéro des compteurs pour la prochaine fenêtre de 200 pas
+                    for (int c = 0; c < PT.nchains; c++) {
+                        accepts_chain[c] = 0; 
+                    }
+                }
+
+                
+                #pragma endregion
+            }
+            
+            //update Markow chains
+            #pragma omp for schedule(dynamic)
+
+            for (int ichain = 0; ichain < PT.nchains ; ichain++){
+                //new model proposal
+                
+                #pragma region new_model
+                //update values of pP
+                std::copy(M.begin() + (ichain * NSubFaults), 
+                          M.begin() + ((ichain + 1) * NSubFaults), 
+                          work.pP.begin());
+
+                double prop;
+                double k_a_sigma;
+
+                double p = unif_dist_intern(gen2);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) {sfindex[ichain]=random_index(gen2); i =sfindex[ichain];}
+
+                
+                prop = unif_dist_plus(gen2) * (PT.k_a_sigma_sup   - PT.k_a_sigma_inf) * sigmas[ichain];
+                if (prop + work.pP[i].k_a_sigma > PT.k_a_sigma_sup)   k_a_sigma = 2 * PT.k_a_sigma_sup - work.pP[i].k_a_sigma - prop ; 
+                else if (prop + work.pP[i].k_a_sigma < PT.k_a_sigma_inf)  k_a_sigma = 2 * PT.k_a_sigma_inf - work.pP[i].k_a_sigma - prop ;
+                else  k_a_sigma   =  work.pP[i].k_a_sigma +  prop;
+                double b_a;
+                prop = unif_dist_plus(gen2) * (PT.b_a_sup         - PT.b_a_inf) * sigmas[ichain];
+                if (prop + work.pP[i].b_a > PT.b_a_sup)   b_a = 2 * PT.b_a_sup - work.pP[i].b_a - prop ; 
+                else if (prop + work.pP[i].b_a < PT.b_a_inf)  b_a = 2 * PT.b_a_inf - work.pP[i].b_a - prop ;
+                else b_a  = work.pP[i].b_a + prop;
+                double D_c_inv;
+                
+                prop = unif_dist_plus(gen2) * (PT.D_c_inv_sup     - PT.D_c_inv_inf) * sigmas[ichain];
+                if (prop + work.pP[i].D_c_inv > PT.D_c_inv_sup)   D_c_inv = 2 * PT.D_c_inv_sup - work.pP[i].D_c_inv - prop ; 
+                else if (prop + work.pP[i].D_c_inv < PT.D_c_inv_inf)  D_c_inv = 2 * PT.D_c_inv_inf - work.pP[i].D_c_inv - prop ;
+                else  D_c_inv   = work.pP[i].D_c_inv  + prop;
+
+                double Dtau_asigma;
+                prop = unif_dist_plus(gen2) * (PT.Dtau_asigma_sup - PT.Dtau_asigma_inf) * sigmas[ichain];
+                if (prop + work.pP[i].Dtau_asigma > PT.Dtau_asigma_sup)   Dtau_asigma = 2 * PT.Dtau_asigma_sup - work.pP[i].Dtau_asigma - prop ; 
+                else if (prop + work.pP[i].Dtau_asigma < PT.Dtau_asigma_inf)  Dtau_asigma = 2 * PT.Dtau_asigma_inf - work.pP[i].Dtau_asigma - prop ;
+                else Dtau_asigma   = work.pP[i].Dtau_asigma  + prop;
+
+                double V0_;
+                prop = unif_dist_plus(gen2) * (PT.V0_sup - PT.V0_inf) * sigmas[ichain];
+                if (prop + work.pP[i].V0_ > PT.V0_sup)   V0_ = 2 * PT.V0_sup - work.pP[i].V0_ - prop ; 
+                else if (prop + work.pP[i].V0_ < PT.V0_inf)  V0_ = 2 * PT.V0_inf - work.pP[i].V0_ - prop ;
+                else V0_   = work.pP[i].V0_  + prop;
+            
+                work.pP[i]=Param(k_a_sigma, b_a, D_c_inv, Dtau_asigma, V0_);
+            
+                #pragma endregion
+
+                #pragma region accept_model
+                
+                double Enew = compute_llk3(i, t_list, data, G , work, storage_matrixes[ichain]);
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen2) );
+                accept = (u <= alpha);
+
+
+                
+                if (Enew <= -1e9) {
+                    if (ichain == 0) {
+                        #pragma omp atomic
+                        crash_count++;
+                    }
+                    crash_count_temp[ichain]++;
+                }
+                
+                
+                
+
+                if (accept){
+                    //copy new model in M
+                    std::copy(work.pP.begin(), work.pP.end(), M.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                }
+
+                if (hotchains) savers[ichain].save_step(work.pP, Enew);
+                else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
+                
+                if ((ichain<PT.ncold) && (llk[ichain]>best_llk) ){
+                    #pragma omp critical(update_best_model)
+                    {
+                    best_llk= llk[ichain]; 
+                    std::copy(M.begin() + ichain * NSubFaults , M.begin() + (ichain + 1) *NSubFaults, best_param.begin()) ; 
+                    best_it= it;}
+                
+                #pragma endregion
+            
+            }
+        }
+
+            #pragma region swap
+            #pragma omp single
+                { 
+
+                
+
+                for (int s = 0; s < PT.nchains - 1; s++) {
+                    int p = rand_chain(gen);
+                    int q = rand_chain(gen);
+                    if ((p == q) ||  (T[p] == T[q])) continue;
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist(gen));
+                    swap_try[p]++;
+                    swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        swap_rate[p]++;
+                        swap_rate[q]++;
+                        std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                    }
+                }}
+            #pragma endregion
+
+
+        }
+        
+    }
+    
+    std::cout<<"\n 100% done \n results ( log likelihood + models ) are saved in model_parameters.csv";
+    std::cout<<"\nlast llk computed"<< llk[0];
+
+    std::cout<<"\n best llk at it  "<<best_it<<" : "<<best_llk;
+    return best_param;
+    }
+
+
 ThreadWorkspace::ThreadWorkspace(int t_list_size) {
     pP.resize(NSubFaults);
     RES_matrix.resize(3 * Nstations, t_list_size);
@@ -910,6 +1267,16 @@ double compute_llk2(const std::vector<sunrealtype>& t_list, const  Eigen::Matrix
                     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work){
 
     int SR = surface_response(work.pP, t_list, work.fault, G, work.RES_matrix, work.storage_matrix);
+    if (SR!=0) return -1e9f;
+    double llk = - (data - work.RES_matrix).array().square().sum();
+    return llk;
+}
+
+
+double compute_llk3(int subfault, const std::vector<sunrealtype>& t_list, const  Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data,
+                    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, ThreadWorkspace& work, Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
+
+    int SR = surface_response_subfault(subfault, work.pP, t_list, work.fault, G, work.RES_matrix, storage_matrix);
     if (SR!=0) return -1e9f;
     double llk = - (data - work.RES_matrix).array().square().sum();
     return llk;
