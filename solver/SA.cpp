@@ -95,6 +95,9 @@ std::vector<Param> SA (int niter, int npert,  const std::vector<sunrealtype>& t_
                     lb =PT.Dtau_asigma_inf ;}
 
                 #pragma endregion
+
+                std::vector<double>err_new (npert,0);
+                std::vector <Param> Param_test (npert);
                 
 
                 for (int ipert=0; ipert<npert; ipert++){
@@ -115,8 +118,20 @@ std::vector<Param> SA (int niter, int npert,  const std::vector<sunrealtype>& t_
 
                     work.pP[num_sf[id_sf]] = Param(*pm1, *pm2, *pm3 , *pm4 , *pm5);
                     llk = compute_llk3(num_sf[id_sf], t_list, data, G, work, work.storage_matrix) ;
-                    if (llk>best_llk) {best_llk=llk ; std::copy(work.pP.begin(), work.pP.end(), best_param.begin());}
+                    //if (llk>best_llk) {best_llk=llk ; std::copy(work.pP.begin(), work.pP.end(), best_param.begin());}
+
+                    err_new[ipert] = llk ;
+                    //Param_test[ipert] =
                 }
+
+                
+                int index_max = std::distance(err_new.begin(), std::max_element(err_new.begin(), err_new.end()));
+                if ( err_new[index_max] < best_llk) {
+                    best_llk = err_new[index_max] ;
+                    best_param = [index_max] ;
+                }
+
+                
             }
         }
     T *= alp ;
