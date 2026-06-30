@@ -23,7 +23,7 @@ int main() {
     */
     Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
     //adresse de G
-    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_2x2subfault_12statsions.txt");
+    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_4x4subfault_12statsions.txt");
     if (!file.is_open()) {
         std::cerr << "Error : Open file." << std::endl;
         return 1;
@@ -142,7 +142,7 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 100.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        10000.0, 30, 30/4,  // T_max descendu à 100.0, nchains=10, ncold=4
+        10000.0, 1000, 250,  // T_max descendu à 100.0, nchains=10, ncold=4
         500000 //burn-in-steps
     );
 
