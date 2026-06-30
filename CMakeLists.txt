@@ -23,6 +23,7 @@ set(SOURCES
     solver/ODE.cpp
     solver/inversion.cpp
     solver/Surface_response.cpp
+    solver/SA.cpp
 )
 
 set(HEADERS
@@ -31,6 +32,7 @@ set(HEADERS
     solver/param.hpp
     solver/Surface_response.hpp
     solver/inversion.hpp
+    solver/SA.hpp
 )
 
 # 3. RECHERCHE DE SUNDIALS

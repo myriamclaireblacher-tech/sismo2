@@ -1,9 +1,4 @@
-#include "inversion.hpp"
-#include <iostream>
-#include <chrono>
-#include <fstream>
-
-#include "inversion.hpp"
+#include "SA.hpp"
 #include <iostream>
 #include <chrono>
 #include <fstream>
@@ -148,7 +143,8 @@ int main() {
 
 
     double timeStart = omp_get_wtime();
-    std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
+    //std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
+    std::vector<Param> best_model = SA(500, 50,t_list, RES_matrix, G, ParametersPT) ;
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;
