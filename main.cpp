@@ -143,8 +143,8 @@ int main() {
 
 
     double timeStart = omp_get_wtime();
-    //std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
-    std::vector<Param> best_model = SA(500, 50,t_list, RES_matrix, G, ParametersPT) ;
+    std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
+    //std::vector<Param> best_model = SA(5000, 20 ,t_list, RES_matrix, G, ParametersPT, 0.0099) ;
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;

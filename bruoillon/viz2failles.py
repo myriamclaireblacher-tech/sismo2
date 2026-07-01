@@ -33,6 +33,9 @@ for sf in range(1, 5):
 dt = np.dtype(fields)
 
 def plot_all_results():
+    """
+    
+    
     bin_files = sorted(glob.glob("chain_cold_*.bin"))
     
     if not bin_files:
@@ -42,6 +45,7 @@ def plot_all_results():
     # ==========================================================
     # 1. TRACES TEMPORELLES (UNIQUEMENT POUR LE FICHIER SPÉCIFIÉ)
     # ==========================================================
+    
     if viz1:
         print(f"Génération des séries temporelles MCMC pour {TARGET_BIN_FOR_HIST} uniquement...")
         # 6 lignes (LLK + 5 paramètres) x 4 colonnes (4 sous-failles)
@@ -88,7 +92,7 @@ def plot_all_results():
     # ==========================================================
     # 2. CORNER PLOT (UNIQUEMENT SUR LE FICHIER BIN SPÉCIFIÉ)
     # ==========================================================
-    """
+    
     if os.path.exists(TARGET_BIN_FOR_HIST):
         print(f"\nLecture de {TARGET_BIN_FOR_HIST} pour la construction des histogrammes...")
         data_cold = np.fromfile(TARGET_BIN_FOR_HIST, dtype=dt)
@@ -171,12 +175,12 @@ def plot_all_results():
                 print(f"  -> Sauvegarde : {output_image}")
     else:
         print(f"\n[Alerte] Le fichier spécifié '{TARGET_BIN_FOR_HIST}' n'existe pas. Pas d'histogrammes générés.")
-        """
+    """
 
     # ==========================================================
     # 3. GRAPHIQUE FIT (STATIONS / COMPOSANTES NORD-EST-Z)
     # ==========================================================
-    """
+    
     file_data = "surface_responses.csv"
     file_pred = "best_results.csv"
 
@@ -217,7 +221,7 @@ def plot_all_results():
             print("\nGraphique de fit des stations généré avec succès !")
 
     print("\nTous les traitements sont finis. Affichage des fenêtres à l'écran...")
-    """
+    
     plt.show()
     
 

@@ -98,9 +98,12 @@ std::vector<Param> SA (int niter, int npert,  const std::vector<sunrealtype>& t_
 
                 std::vector<double>err_new (npert,0);
                 std::vector <Param> Param_test (npert);
+                Param P_old = work.pP[num_sf[id_sf]] ;
                 
 
-                for (int ipert=0; ipert<npert; ipert++){
+                for (int ipert=0; ipert<npert; ipert++){ //paralléliser
+                    work.pP[num_sf[id_sf]] = P_old  ;
+
                     double P_new ;
                     do {double alpha = unif_dist(gen);
                     // -> Perturbation distance 
@@ -115,23 +118,42 @@ std::vector<Param> SA (int niter, int npert,  const std::vector<sunrealtype>& t_
 
                     *old_param = P_new ;
 
-
                     work.pP[num_sf[id_sf]] = Param(*pm1, *pm2, *pm3 , *pm4 , *pm5);
                     llk = compute_llk3(num_sf[id_sf], t_list, data, G, work, work.storage_matrix) ;
-                    //if (llk>best_llk) {best_llk=llk ; std::copy(work.pP.begin(), work.pP.end(), best_param.begin());}
+                    if (llk>best_llk) {best_llk=llk ; std::copy(work.pP.begin(), work.pP.end(), best_param.begin());}
 
                     err_new[ipert] = llk ;
-                    //Param_test[ipert] =
+                    Param_test[ipert] = Param(*pm1, *pm2, *pm3 , *pm4 , *pm5) ;
                 }
 
+                double err_min = *std::max_element(err_new.begin(), err_new.end()) ;
+
+                double sum=0 ;
+                for (int j=0; j< npert; j++ ) {
+                    double prop = std:: exp (( err_new[j] - err_min )/T) ;
+                    if (prop < std::numeric_limits<double>::epsilon() ) err_new[j] = std::numeric_limits<double>::epsilon() ;
+                    else err_new[j] = prop ;
+                    sum+= err_new[j] ; }
                 
-                int index_max = std::distance(err_new.begin(), std::max_element(err_new.begin(), err_new.end()));
-                if ( err_new[index_max] < best_llk) {
-                    best_llk = err_new[index_max] ;
-                    best_param = [index_max] ;
+                
+                std :: vector <double> cumsum(npert);
+                cumsum[0] = err_new[0]/sum ;
+                for (int j=1 ; j<npert; j++){
+                    cumsum[j] = cumsum[j-1] + err_new[j]/sum ;
+                }
+                
+                double u = unif_dist(gen) ;
+
+                int ichoose=0;
+                for (int  j =0 ; j< npert-1; j++) {
+                    if (u <= cumsum[j]) { 
+                        ichoose = j;
+                        break;
+                    } 
                 }
 
-                
+                work.pP[num_sf[id_sf]] = Param_test[ichoose];
+                llk = compute_llk3(num_sf[id_sf], t_list, data, G, work, work.storage_matrix) ;
             }
         }
     T *= alp ;
