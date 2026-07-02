@@ -1,4 +1,4 @@
-#include "SA.hpp"
+#include "inversion.hpp"
 #include <iostream>
 #include <chrono>
 #include <fstream>
@@ -137,18 +137,19 @@ int main() {
         0.3, 10,    // b_a : 1/10 - 3
         0.0, 100.0,   // D_c_inv 
         0.0, 10.0,    // Dtau_asigma 
-        10000.0, 1000, 250,  // T_max descendu à 100.0, nchains=10, ncold=4
-        500000 //burn-in-steps
+        2000.0, 80, 80/4,  // T_max descendu à 100.0, nchains=10, ncold=4
+        100000 //burn-in-steps
     );
 
 
     double timeStart = omp_get_wtime();
-    std::vector<Param> best_model = parallel_tempering_2sf(2500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
+    std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
+    //std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
     //std::vector<Param> best_model = SA(5000, 20 ,t_list, RES_matrix, G, ParametersPT, 0.0099) ;
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;
-    std::cout<<"\ntemps total : "<<int(timeTotal)/60<<" min ";
+    std::cout<<"\ntemps total : "<<int(timeTotal)<<" s ";
 
 
     #pragma region export_best_model
