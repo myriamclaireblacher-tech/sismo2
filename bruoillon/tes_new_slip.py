@@ -87,6 +87,8 @@ if __name__ == "__main__":
     plot_all_results()
     
     
+
+
 import os
 import glob
 import numpy as np
@@ -117,148 +119,196 @@ param2_max_possible = 5.0
 param3_min_possible = -2.0  
 param3_max_possible = 2.0   
 
-param1_inf = param1_min_possible
-param1_sup = param1_max_possible
+param1_inf = 0
+param1_sup = 5
 
-param2_inf = param2_min_possible
-param2_sup = param2_max_possible
+param2_inf = 0
+param2_sup = 1000
 
-param3_inf = param3_min_possible
-param3_sup = param3_max_possible
+param3_inf = 0
+param3_sup = 1
 
 # --- VALEURS THÉORIQUES MIN ET MAX POSSIBLES (Issues de tes "Bounds_Param") ---
 param1_min_possible = 0.0   
 param1_max_possible = 5  
 
 param2_min_possible = 0.0   
-param2_max_possible = 5.0   
+param2_max_possible = param2_sup   
 
-param3_min_possible = -2.0  
-param3_max_possible = 2.0   
+param3_min_possible = param3_inf
+param3_max_possible = param3_sup   
+
+# --- EMPLACEMENTS VIDES POUR AJUSTER LES BORNES DES HISTOGRAMMES 1D (AXE X) ---
+param1_hist_min, param1_hist_max = param1_min_possible, param1_max_possible
+param2_hist_min, param2_hist_max = param2_min_possible, param2_max_possible
+param3_hist_min, param3_hist_max = param3_min_possible, param3_max_possible
+
 
 # =============================================================================
-# 2. LECTURE ET FUSION DE TOUS LES FICHIERS
+# 2. LECTURE, SELECTION DU MEILLEUR MODÈLE (MAX LLK) ET FUSION
 # =============================================================================
 files_to_analyze = glob.glob(file_pattern)
 
 if not files_to_analyze:
-    raise FileNotFoundError(f"Aucun fichier correspondant à '{file_pattern}' n'a été trouvé dans le dossier actuel.")
+    raise FileNotFoundError(f"Aucun fichier correspondant à '{file_pattern}' n'a été trouvé.")
 
 print(f"Trouvé {len(files_to_analyze)} fichier(s) de chaîne froide à analyser.")
 
 doubles_per_step = 1 + NSubFaults * 3
 skip_iterations = 15000 * NSubFaults
 
-all_p1_samples = []
-all_p2_samples = []
-all_p3_samples = []
+all_llks = []
+all_params_flat = []
 
 for filepath in sorted(files_to_analyze):
     print(f"Traitement de {os.path.basename(filepath)}...")
-    
     raw_data = np.fromfile(filepath, dtype=np.float64)
     total_steps = len(raw_data) // doubles_per_step
     
     if total_steps <= skip_iterations:
-        print(f"  -> ATTENTION : Fichier ignoré (seulement {total_steps} itérations, "
-              f"inférieur au burn-in de {skip_iterations}).")
+        print(f"  -> ATTENTION : Fichier ignoré (Burn-in non dépassé).")
         continue
         
     data_matrix = raw_data[:total_steps * doubles_per_step].reshape(total_steps, doubles_per_step)
-    post_burn_data = data_matrix[skip_iterations:, 1:] 
     
-    params_3d = post_burn_data.reshape(-1, NSubFaults, 3)
-    
-    all_p1_samples.append(params_3d[:, :, 0])
-    all_p2_samples.append(params_3d[:, :, 1])
-    all_p3_samples.append(params_3d[:, :, 2])
+    all_llks.append(data_matrix[skip_iterations:, 0])
+    all_params_flat.append(data_matrix[skip_iterations:, 1:])
 
-if not all_p1_samples:
+if not all_llks:
     raise ValueError("Aucune donnée valide n'a pu être extraite après le burn-in.")
 
-p1_data = np.vstack(all_p1_samples)
-p2_data = np.vstack(all_p2_samples)
-p3_data = np.vstack(all_p3_samples)
+global_llk = np.concatenate(all_llks)
+global_params_flat = np.vstack(all_params_flat)
 
 print(f"\n--- Statistique Globale ---")
-print(f"Nombre total d'échantillons cumulés après burn-in : {p1_data.shape[0]}")
+print(f"Nombre total d'échantillons cumulés : {global_llk.shape[0]}")
 
-mean_p1 = np.mean(p1_data, axis=0).reshape(grid_size, grid_size)
-mean_p2 = np.mean(p2_data, axis=0).reshape(grid_size, grid_size)
-mean_p3 = np.mean(p3_data, axis=0).reshape(grid_size, grid_size)
+# EXTRACTION DU MEILLEUR MODÈLE (MAX LLK)
+best_step_idx = np.argmax(global_llk)
+best_llk_value = global_llk[best_step_idx]
+print(f"Meilleure Vraisemblance (Max LLK) trouvée : {best_llk_value}")
+
+best_model_raw = global_params_flat[best_step_idx].reshape(NSubFaults, 3)
+best_grid_p1 = best_model_raw[:, 0].reshape(grid_size, grid_size)
+best_grid_p2 = best_model_raw[:, 1].reshape(grid_size, grid_size)
+best_grid_p3 = best_model_raw[:, 2].reshape(grid_size, grid_size)
+
+# Séparation de l'historique complet pour les plots
+params_3d = global_params_flat.reshape(-1, NSubFaults, 3)
+p1_hist_data = params_3d[:, :, 0]
+p2_hist_data = params_3d[:, :, 1]
+p3_hist_data = params_3d[:, :, 2]
+
+# Helper interne pour extraire proprement les cibles scalaires ou vectorielles
+def get_target_val(target, sf_idx):
+    if target is None: return None
+    return target[sf_idx] if isinstance(target, (list, np.ndarray, tuple)) else target
 
 # =============================================================================
-# 3. TRACÉ DES HISTOGRAMMES FUSIONNÉS AVEC LIGNES CIBLES
+# 3. TRACÉ DES HISTOGRAMMES 1D FUSIONNÉS (SANS SHAREX MANDATOIRE)
 # =============================================================================
 param_names = ["a_sigma_k", "super_big_param", "big_param"]
-param_datasets = [p1_data, p2_data, p3_data]
+param_datasets = [p1_hist_data, p2_hist_data, p3_hist_data]
 param_targets = [param1_target, param2_target, param3_target]
 
+hist_bounds = [
+    {"min": param1_hist_min, "max": param1_hist_max},
+    {"min": param2_hist_min, "max": param2_hist_max},
+    {"min": param3_hist_min, "max": param3_hist_max}
+]
+
 for p_idx, p_name in enumerate(param_names):
-    fig, axes = plt.subplots(grid_size, grid_size, figsize=(12, 12), sharex=True)
-    fig.suptitle(f"Histogrammes Cumulés - Paramètre : {p_name}", fontsize=15, fontweight='bold')
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(11, 11), sharex=False)
+    fig.suptitle(f"Histogrammes de Densité 1D - Paramètre : {p_name}", fontsize=14, fontweight='bold')
     
     current_data = param_datasets[p_idx]
-    current_target = param_targets[p_idx]
+    current_bounds = hist_bounds[p_idx]
     
     for sf in range(NSubFaults):
-        row = sf // grid_size
-        col = sf % grid_size
+        row, col = sf // grid_size, sf % grid_size
         ax = axes[row, col]
         
-        # Histogramme des échantillons MCMC
         ax.hist(current_data[:, sf], bins=50, color='skyblue', edgecolor='black', alpha=0.7, density=True)
         ax.set_title(f"Sous-faille {sf}", fontsize=9)
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
+        ax.grid(axis='y', linestyle='--', alpha=0.4)
         
-        # Ajout de la ligne cible si elle est définie
-        if current_target is not None:
-            if isinstance(current_target, (list, np.ndarray, tuple)):
-                tgt_value = current_target[sf]
-            else:
-                tgt_value = current_target # Valeur unique globale
-                
-            ax.axvline(x=tgt_value, color='red', linestyle='--', linewidth=2, label='Cible' if sf == 0 else "")
-            if sf == 0:
-                fig.legend(loc='upper right')
+        if current_bounds["min"] is not None or current_bounds["max"] is not None:
+            ax.set_xlim(current_bounds["min"], current_bounds["max"])
+            
+        tgt = get_target_val(param_targets[p_idx], sf)
+        if tgt is not None:
+            ax.axvline(x=tgt, color='red', linestyle='--', linewidth=1.5, label='Cible' if sf == 0 else "")
+            if sf == 0: fig.legend(loc='upper right')
         
     plt.tight_layout()
 
 # =============================================================================
-# 4. TRACÉ DES GRILLES SPATIALES REPRÉSENTANT LES MOYENNES
+# 4. CORNER PLOTS (HISTOGRAMMES 1D + 2D) POUR 3 SOUS-FAILLES ALÉATOIRES
 # =============================================================================
-fig_maps, axes_maps = plt.subplots(1, 3, figsize=(18, 6))
-fig_maps.suptitle("Moyennes globales a posteriori sur la géométrie 4x4", fontsize=16, fontweight='bold')
+np.random.seed(None) 
+selected_subfaults = sorted(np.random.choice(NSubFaults, size=3, replace=False))
+print(f"\nSous-failles sélectionnées aléatoirement pour les plots 2D : {selected_subfaults}")
 
-maps_config = [
-    {"mean_matrix": mean_p1, "name": "a_sigma_k", "vmin": param1_inf, "vmax": param1_sup, "p_min": param1_min_possible, "p_max": param1_max_possible, "cmap": "viridis"},
-    {"mean_matrix": mean_p2, "name": "super_big_param", "vmin": param2_inf, "vmax": param2_sup, "p_min": param2_min_possible, "p_max": param2_max_possible, "cmap": "plasma"},
-    {"mean_matrix": mean_p3, "name": "big_param", "vmin": param3_inf, "vmax": param3_sup, "p_min": param3_min_possible, "p_max": param3_max_possible, "cmap": "inferno"}
-]
+for sf in selected_subfaults:
+    print(f"Génération du Corner Plot : Sous-faille {sf}...")
+    
+    # Données pour la sous-faille courante
+    params_cold = [p1_hist_data[:, sf], p2_hist_data[:, sf], p3_hist_data[:, sf]]
+    
+    # Meilleur modèle localisé
+    best_values = [
+        best_grid_p1[sf // grid_size, sf % grid_size],
+        best_grid_p2[sf // grid_size, sf % grid_size],
+        best_grid_p3[sf // grid_size, sf % grid_size]
+    ]
 
-for idx, cfg in enumerate(maps_config):
-    ax = axes_maps[idx]
-    
-    im = ax.imshow(cfg["mean_matrix"], cmap=cfg["cmap"], vmin=cfg["vmin"], vmax=cfg["vmax"], origin='upper')
-    
-    for r in range(grid_size):
-        for c in range(grid_size):
-            sf_num = r * grid_size + c
-            val_txt = f"{cfg['mean_matrix'][r, c]:.2f}"
-            ax.text(c, r, f"SF {sf_num}\n{val_txt}", ha="center", va="center", 
-                    color="white" if im.norm(cfg["mean_matrix"][r, c]) < 0.5 else "black", fontweight='bold', fontsize=9)
-            
-    ax.set_title(f"Paramètre : {cfg['name']}", fontsize=13, pad=10)
-    ax.set_xticks(range(grid_size))
-    ax.set_yticks(range(grid_size))
-    
-    fig_maps.colorbar(im, ax=ax, shrink=0.8)
-    
-    # Encadré des limites absolues min/max possibles
-    ax.text(1.25, -0.08, f"Limites possibles :\nMin : {cfg['p_min']}\nMax : {cfg['p_max']}", 
-            transform=ax.transAxes, fontsize=10, verticalalignment='bottom',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='linen', alpha=0.5))
+    # Cibles
+    corner_true_values = [
+        get_target_val(param1_target, sf),
+        get_target_val(param2_target, sf),
+        get_target_val(param3_target, sf)
+    ]
+    corner_param_names = [f"a_sigma_k (SF{sf})", f"super_big_param (SF{sf})", f"big_param (SF{sf})"]
 
-plt.tight_layout()
-print("\nAnalyse terminée. Affichage des graphiques...")
-plt.show()
+    fig_corner, axes_corner = plt.subplots(3, 3, figsize=(10, 10))
+    fig_corner.suptitle(f"F{sf} - Corner Plot a posteriori (Max LLK: {best_llk_value:.2f})", fontweight='bold', fontsize=14)
+
+    # Synchronisation 2D matricielle des axes
+    for i in range(3):
+        for j in range(3):
+            if i >= j:
+                if i != j: axes_corner[i, j].sharex(axes_corner[j, j])
+                if i > j and j > 0: axes_corner[i, j].sharey(axes_corner[i, 0])
+
+    # Remplissage du Corner Plot
+    for i in range(3):
+        for j in range(3):
+            ax = axes_corner[i, j]
+            if i == j:  # Diagonale : Marginale 1D
+                ax.hist(params_cold[i], bins=40, color='royalblue', edgecolor='black', alpha=0.7, density=True)
+                if corner_true_values[i] is not None:
+                    ax.axvline(corner_true_values[i], color='red', linestyle='--', linewidth=2.0, label="Cible")
+                ax.axvline(best_values[i], color='darkviolet', linestyle=':', linewidth=2.0, label="Meilleur LLK")
+                if i == 0: ax.legend(fontsize='x-small')
+                
+            elif i > j: # Triangle inférieur : Histogramme 2D
+                ax.hist2d(params_cold[j], params_cold[i], bins=35, cmap='Blues', cmin=1)
+                if corner_true_values[j] is not None and corner_true_values[i] is not None:
+                    ax.plot(corner_true_values[j], corner_true_values[i], marker='+', color='red', markersize=8, markeredgewidth=1.5)
+                ax.plot(best_values[j], best_values[i], marker='x', color='darkviolet', markersize=8, markeredgewidth=1.5)
+                
+            else:       # Triangle supérieur : Vide
+                ax.axis('off')
+                
+            # Formatage des labels (correction fontweight ici)
+            if i == 2: ax.set_xlabel(corner_param_names[j], fontweight='bold', fontsize=10)
+            if j == 0 and i > 0: ax.set_ylabel(corner_param_names[i], fontweight='bold', fontsize=10)
+
+            # Invisibilité des axes intérieurs redondants
+            if i < 2: ax.tick_params(labelbottom=False)
+            if j > 0 or i == 0: ax.tick_params(labelleft=False)
+
+    fig_corner.subplots
+    
+    
+    plt.show()
