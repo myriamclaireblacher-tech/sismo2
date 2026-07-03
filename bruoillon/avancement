@@ -31,3 +31,9 @@ recherche de minimum : stations à erreurs élevées : side etc
 
 Test à faire : Covariance entre paramètres? (moyenne (X-E[X])*(Y-E[Y]))
 Coviariance due à sigma?
+
+Rapportdu 03/07
+L'algorithme a du mal à trouver pour 4 sous failles (temps de calcul + convergence 
+difficile vers les paramètres. Observations expliquent suffisament mais loin du bon modèle).
+Problème plus simple (steady state) pour commencer. 
+Idée : swaps de certains paramètres/sous failles/blocs seulement

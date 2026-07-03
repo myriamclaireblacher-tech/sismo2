@@ -68,7 +68,7 @@ double llk_easy_i (int index, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>
         return llk ;
     } 
 
-
+/*
 std::vector<Easy_Param> inversion_easy_PT(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, int seed ){
 
@@ -310,6 +310,19 @@ std::vector<Easy_Param> inversion_easy_PT(int maxint, Bounds_Param bds, Eigen::M
     
     return best_model ; 
 }
+*/
+
+struct ChainSaver {
+    std::ofstream file;
+    ChainSaver(int cold_idx)
+        {
+            file.open("Easy_chain_cold_" + std::to_string(cold_idx) + ".bin", std::ios::binary);
+        } ;
+    void save_step(const std::vector<Easy_Param>& pP, double energy)
+        {file.write(reinterpret_cast<const char*>(&energy), sizeof(double));
+        file.write(reinterpret_cast<const char*>(pP.data()), pP.size() * sizeof(Easy_Param));} ;
+};
+
 
 
 std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
@@ -324,7 +337,13 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
     std::vector<double> accepts_chain(bds.nchains) ;
     //--------------------------------------------------------------------------------------------------
 
-    int param_size=3;
+    std::vector<ChainSaver> savers;
+    for (int i = 0; i < bds.ncold; ++i) {
+        savers.emplace_back(i);
+    }
+
+    int nparam=3;
+    int param_num=0;
 
     std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (bds.nchains);
     for(int c=0; c<bds.nchains; c++){
@@ -334,7 +353,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
     int adapt_window=200;
     std::vector<std::vector<double>> SIGMAS (bds.nchains) ; 
     for(int c=0; c<bds.nchains; c++){
-                SIGMAS[c]={0.01 , 0.01 , 0.01 }
+                SIGMAS[c]={0.01 , 0.01 , 0.01, 1 };
     }
 
     std::vector<Easy_Param> P(bds.nchains*NSubFaults) ;
@@ -362,6 +381,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
     
     #pragma omp parallel
     {
+        #pragma region model_i
         Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix(3*Nstations, t_list.size());
         
 
@@ -369,6 +389,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
         std::uniform_int_distribution<int> random_index(0, NSubFaults-1); 
         std::uniform_real_distribution<double> unif_dist_plus(-1.0 , 1.0);
         std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0);
+        std::uniform_int_distribution<int> random_param(0, nparam-1);
 
         #pragma omp single
         {
@@ -384,16 +405,19 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
             std::copy(P.begin() + (j * NSubFaults), P.begin() + (j+1) * NSubFaults, P_new.begin()) ;
             llk[j] = llk_easy (data, t_list, P_new, G, RES_matrix, storage_matrixes[j]) ;
             if (llk[j]>best_llk) best_llk=llk[j];
+            if (j<bds.ncold) savers[j].save_step(P_new, llk[j]);
             
         }
 
         std::cout<<"\n best  initial llk : "<<best_llk ;
 
         
-        }
 
-        int param_num= 0 ; 
-        for (int it=0; it<bds.burn_in ; it++ ){
+        
+        }
+        #pragma endregion
+
+        for (int it=0; it<bds.burn_in*NSubFaults*2/3 ; it++ ){
 
             #pragma omp single
             {
@@ -401,12 +425,12 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
             #pragma region affichage
 
             if (it > 0 && (it % 10000 == 0) ) {
-                    std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
                     for (int c = 0; c < std::min(bds.nchains,6); c++) {
                         std::cout << "\nChain " << c 
                                   << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
                                   << " |  sigma : (" << SIGMAS[c][0]<<" , "<<SIGMAS[c][1]<<" , "<< SIGMAS[c][2]<< " ) "
-                                  << " |  T : " << T[c] ;}
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c];}
 
                     //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
                     std::cout
@@ -419,39 +443,28 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
 
             
             #pragma region adaptation 
-
             
-
             if (it > 0 && it % adapt_window == 0) {
 
                      
-                    std::vector<double> acc_rate (bds.nchains);
-                    for (int c = 0; c < bds.nchains; c++) {
-                        acc_rate[c] = (double)accepts_chain[c] / adapt_window;
-                        accepts_chain[c] = 0; 
-                    }
-                    // On adapte uniquement si on est dans la période de Burn-in
-                    
-                    for (int c = 0; c < bds.nchains; c++) {
-                        //sigma                        
-                        
-                        if (it < bds.burn_in/2){
-                            if ((acc_rate[c] < 0.20 ) && (sigmas[c]>1e-15)) {
-                            sigmas[c] *= 0.9 ;
-                            } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1) )  sigmas[c] *= 1.1; 
-                            
-                        }
-                        else
-                            {if ((acc_rate[c] < 0.20 )&&(sigmas[c]>1e-15)) {
-                            sigmas[c] *= 0.9 ;
-                            } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1) )  sigmas[c] *= 1.1; }
-                        ;
-                        
-                    
+                std::vector<double> acc_rate (bds.nchains);
+                for (int c = 0; c < bds.nchains; c++) {
+                    acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                    accepts_chain[c] = 0; 
                 }
+                // On adapte uniquement si on est dans la période de Burn-in
+                
+                for (int c = 0; c < bds.nchains; c++) {
+                    //sigma                        
+                    if ((acc_rate[c] < 0.20 ) && (SIGMAS[c][param_num]>1e-7)) {
+                    SIGMAS[c][param_num] *= 0.9 ;
+                    } else if ((acc_rate[c] > 0.30) &&(SIGMAS[c][param_num]<0.1) )  SIGMAS[c][param_num] *= 1.1; 
+                }
+                param_num= random_param(gen) ;
+            }
             #pragma endregion
 
-            }
+            
             }
 
             #pragma omp for
@@ -464,29 +477,30 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
                 int i = sfindex[ichain] ;
                 if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
 
-                if (ichain==5) subfault_index[i]++;
+                //if (ichain==5) subfault_index[i]++;
 
 
                 std::vector<Easy_Param> P_new (NSubFaults);
                 std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
 
                 //newmodel
-                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * sigmas[ichain];
+                if (param_num==0){
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0];
                 if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
                 else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
-                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;}
 
-                
-                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * sigmas[ichain];
+                else if (param_num==1){
+                double prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1];
                 if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
                 else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
-                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;}
 
-
-                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * sigmas[ichain];
+                else {
+                double prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2];
                 if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
                 else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
-                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+                else  P_new[i].big_param   =  P_new[i].big_param +  prop;}
 
                 Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
 
@@ -515,6 +529,8 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
                     }
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
+
+                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -551,8 +567,9 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
         }
 
 
-
-        for (int it=bds.burn_in; it<maxint ; it++ ){
+        #pragma omp single
+        {std::cout<<"\n END OF PHASE 1 ";}
+        for (int it=bds.burn_in*NSubFaults*2/3; it<bds.burn_in*NSubFaults ; it++ ){
 
             #pragma omp single
             {
@@ -560,12 +577,12 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
             #pragma region affichage
 
             if (it > 0 && (it % 10000 == 0) ) {
-                    std::cout <<"\n"<< std::setw(3) << (100 * it / maxint) << "% done" << std::endl;
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
                     for (int c = 0; c < std::min(bds.nchains,6); c++) {
                         std::cout << "\nChain " << c 
                                   << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
-                                  << " |  sigma : " << sigmas[c] 
-                                  << " |  T : " << T[c] ;}
+                                  << " |  sigma adjust : (" << SIGMAS[c][nparam]<<" ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c];}
 
                     //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
                     std::cout
@@ -579,31 +596,23 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
             
             #pragma region adaptation 
 
+            
+
             if (it > 0 && it % adapt_window == 0) {
+
                      
-                    std::vector<double> acc_rate (bds.nchains);
-                    for (int c = 0; c < bds.nchains; c++) {
-                        acc_rate[c] = (double)accepts_chain[c] / adapt_window;
-                        accepts_chain[c] = 0; 
-                    }
-                    // On adapte uniquement si on est dans la période de Burn-in
-                    if (it < bds.burn_in) {
-                        for (int c = 0; c < bds.nchains; c++) {
-                            //sigma                        
-                            
-                            if (it < bds.burn_in/2){
-                                if ((acc_rate[c] < 0.20 ) && (sigmas[c]>1e-15)) {
-                                sigmas[c] *= 0.9 ;
-                                } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1) )  sigmas[c] *= 1.1; 
-                                
-                            }
-                            else
-                                {if ((acc_rate[c] < 0.20 )&&(sigmas[c]>1e-15)) {
-                                sigmas[c] *= 0.9 ;
-                                } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1) )  sigmas[c] *= 1.1; }
-                            ;}
-                        
-                    
+                std::vector<double> acc_rate (bds.nchains);
+                for (int c = 0; c < bds.nchains; c++) {
+                    acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                    accepts_chain[c] = 0; 
+                }
+                // On adapte uniquement si on est dans la période de Burn-in
+                
+                for (int c = 0; c < bds.nchains; c++) {
+                    //sigma                        
+                    if (acc_rate[c] < 0.20 )  {
+                    SIGMAS[c][nparam] *= 0.9 ;
+                    } else if (acc_rate[c] > 0.30)  SIGMAS[c][nparam] *= 1.1; 
                 }
             #pragma endregion
 
@@ -620,26 +629,24 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
                 int i = sfindex[ichain] ;
                 if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
 
-                if (ichain==5) subfault_index[i]++;
+                //if (ichain==5) subfault_index[i]++;
 
 
                 std::vector<Easy_Param> P_new (NSubFaults);
                 std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
 
                 //newmodel
-                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * sigmas[ichain];
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
                 if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
                 else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
                 else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
 
-                
-                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * sigmas[ichain];
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
                 if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
                 else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
                 else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
 
-
-                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * sigmas[ichain];
+                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
                 if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
                 else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
                 else  P_new[i].big_param   =  P_new[i].big_param +  prop;
@@ -671,6 +678,160 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
                     }
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
+                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
+
+                #pragma endregion
+            }
+
+            #pragma region swap
+            #pragma omp single
+            {
+                for (int hey=0; hey<2; hey++){
+                for (int s = 0; s < bds.nchains - 1; s++) {
+                    int p = rand_chain(gen);
+                    int q = rand_chain(gen);
+                    if ((p == q) ||  (T[p] == T[q])) continue;
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        swap_rate++;
+                        std::swap_ranges(P.begin() + (p * NSubFaults), P.begin() + ((p + 1) * NSubFaults), P.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]); /////////////////////////ici
+                    }
+            }}}
+
+            
+            
+            #pragma endregion
+
+        }
+
+
+        #pragma region adapt
+        #pragma omp single
+        {std::cout<<"\n END OF PHASE 2 ";
+        double mean1=0;
+        double mean2=0;
+        double mean3=0;
+        double mean4=0;
+        for (int i=0;i<bds.ncold; i++){
+            mean1+= SIGMAS[i][0];
+            mean2+= SIGMAS[i][1];
+            mean3+= SIGMAS[i][2];
+            mean4+= SIGMAS[i][3];
+        }
+        mean1/=bds.ncold;
+        mean2/=bds.ncold;
+        mean3/=bds.ncold;
+        mean4/=bds.ncold;
+        for (int i=0; i<bds.nchains; i++){
+            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][4] = mean4;}
+            else{SIGMAS[i][0]= mean1*std::sqrt(T[i]);SIGMAS[i][1]= mean2*std::sqrt(T[i]);SIGMAS[i][2]= mean3*std::sqrt(T[i]);SIGMAS[i][3]= mean4*std::sqrt(T[i]); }
+        }
+        #pragma endregion
+
+        
+        }
+        for (int it=bds.burn_in*NSubFaults; it<maxint*NSubFaults ; it++ ){
+
+            #pragma omp single
+            {
+            
+            #pragma region affichage
+
+            if (it > 0 && (it % 10000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(bds.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : (" << SIGMAS[c][0]<<" , "<<SIGMAS[c][1]<<" , "<< SIGMAS[c][2]<<" , "<< SIGMAS[c][3] << " ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c] ;}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                }
+            if (it%adapt_window==0) {for (int c=0; c<bds.nchains; c++) accepts_chain[c]=0 ;}
+            
+
+            #pragma endregion
+
+
+            }
+            
+
+            #pragma omp for
+            for (int ichain=0; ichain<bds.nchains ;  ichain++){
+
+                #pragma region new_model
+
+
+                double p = unif_dist_intern(gen);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
+
+                if (ichain==5) subfault_index[i]++;
+
+
+                std::vector<Easy_Param> P_new (NSubFaults);
+                std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
+
+                //newmodel
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
+                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
+                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+
+                
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
+                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
+                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
+                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
+                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
+
+                double Enew = llk_easy_i (i, data, t_list, P_new, G, RES_matrix, storage_matrixes[ichain]);
+                
+                #pragma endregion
+
+                #pragma region acept
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen) );
+                accept = (u <= alpha);
+
+                if (accept){
+                    std::copy(P_new.begin(), P_new.end(), P.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                    if (Enew>best_llk) {
+                        #pragma omp critical (updat_best_model)
+                        {
+                            if (Enew>best_llk) {
+                        best_llk=Enew ;
+                        best_model = P_new ; }}
+                    }
+                }
+                else storage_matrixes[ichain].row(i) = old_line;
+
+                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -712,8 +873,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigma(int maxint, Bounds_Param bds, Ei
     
 
     std::cout<<"\nFinal best llk : "<<best_llk;
-    std::cout<<"\n average number of swap per chain: "<<swap_rate*1.0/bds.nchains;
-    std::cout<<"\n swap every "<<maxint/(swap_rate*1.0/bds.nchains)<<"   iterations";
+    std::cout<<"\n swap every "<<maxint*NSubFaults/(swap_rate*1.0/bds.nchains)<<"   iterations";
     
     return best_model ; 
 }
