@@ -1659,6 +1659,9 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
     }
 
     std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (PT.nchains);
+    for(int c=0; c<PT.nchains; c++){
+                storage_matrixes[c].resize(NSubFaults, t_list.size());
+    }
 
 
     //sigma
@@ -1764,26 +1767,31 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
                 //update sigma
                 #pragma region adaptation
                 if (it > 0 && it % adapt_window == 0) {
-                     
-                    
+                    std::vector<double> acc_rate(PT.nchains);
+                    for (int c=0; c<PT.nchains; c++){
+                        acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                        crash_count_temp[c]=0 ;
+
+                    }
+
                     // On adapte uniquement si on est dans la période de Burn-in
                     if (it < PT.burn_in_steps) {
                         for (int c = 0; c < PT.nchains; c++) {
                             //sigma
                             crashtest[c] = (crash_count_temp[c]==0) ;
-                            double acc_rate = (double)accepts_chain[c] / adapt_window;
+                            
                             
                             if (it < PT.burn_in_steps/2){
-                                if ((acc_rate < 0.20 ) && (sigmas[c]>1e-7)) {
+                                if ((acc_rate[c] < 0.20 ) && (sigmas[c]>1e-7)) {
                                 sigmas[c] *= 0.9 ;
-                                } else if ((acc_rate > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; 
+                                } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; 
                                 
                             }
                             else
-                                {if ((acc_rate < 0.20 )&&(sigmas[c]>1e-7)) {
+                                {if ((acc_rate[c] < 0.20 )&&(sigmas[c]>1e-7)) {
                                 sigmas[c] *= 0.9 ;
-                                } else if ((acc_rate > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; }
-                            crash_count_temp[c]=0 ;}
+                                } else if ((acc_rate[c] > 0.30) &&(sigmas[c]<0.1)&& (crashtest[c]) )  sigmas[c] *= 1.1; }
+                            }
                             
                             
                             /*
@@ -1873,6 +1881,7 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
                 #pragma endregion
 
                 #pragma region accept_model
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
                 
                 double Enew = compute_llk4(i, t_list, data, G , work, storage_matrixes[ichain]);
 
@@ -1901,6 +1910,7 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
                     llk[ichain] = Enew;
                     accepts_chain[ichain]++;
                 }
+                else storage_matrixes[ichain].row(i) = old_line; 
 
                 if (hotchains) savers[ichain].save_step(work.pP, Enew);
                 else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
@@ -1939,6 +1949,7 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
                         swap_rate[q]++;
                         std::swap_ranges(M.begin() + (p * NSubFaults), M.begin() + ((p + 1) * NSubFaults), M.begin() + (q * NSubFaults));
                         std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]);
                     }
                 }}
             #pragma endregion

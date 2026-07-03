@@ -24,34 +24,40 @@ plt.show()
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 1. Charger les données
-file_path = 'surface_responses.csv'
-df = pd.read_csv(file_path)
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1. Charger les deux jeux de données
+df_obs = pd.read_csv('surface_responses.csv')
+df_pred = pd.read_csv('best_results.csv')
 
 # 2. Configurer la figure
-# On suppose qu'il y a N stations. On crée une ligne par station.
-# Chaque ligne aura 3 colonnes pour North, East, Depth.
-n_stations = (df.shape[1] - 1) // 3
-fig, axes = plt.subplots(n_stations, 1, figsize=(10, 3 * n_stations), sharex=True)
+n_stations = (df_obs.shape[1] - 1) // 3
+fig, axes = plt.subplots(n_stations, 1, figsize=(11, 3 * n_stations), sharex=True)
 
-# Gérer le cas où il n'y a qu'une seule station (axes n'est pas une liste)
 if n_stations == 1:
     axes = [axes]
 
-# 3. Tracer les données
+# 3. Tracer et superposer les données
 for i in range(n_stations):
-    # Les colonnes pour la station i+1
     col_n = f'St{i+1}_North'
     col_e = f'St{i+1}_East'
     col_d = f'St{i+1}_Depth'
     
-    axes[i].plot(df['Time'], df[col_n], label='North')
-    axes[i].plot(df['Time'], df[col_e], label='East')
-    axes[i].plot(df['Time'], df[col_d], label='Depth')
+    # --- DONNÉES OBSERVÉES (Lignes pleines) ---
+    axes[i].plot(df_obs['Time'], df_obs[col_n], color='crimson', label='Obs North')
+    axes[i].plot(df_obs['Time'], df_obs[col_e], color='royalblue', label='Obs East')
+    axes[i].plot(df_obs['Time'], df_obs[col_d], color='forestgreen', label='Obs Depth')
+    
+    # --- MODÈLE INVERSÉ / PRÉDIT (Lignes pointillées -- ) ---
+    axes[i].plot(df_pred['Time'], df_pred[col_n], color='darkred', linestyle='--', alpha=0.8, label='MCMC North')
+    axes[i].plot(df_pred['Time'], df_pred[col_e], color='darkblue', linestyle='--', alpha=0.8, label='MCMC East')
+    axes[i].plot(df_pred['Time'], df_pred[col_d], color='darkgreen', linestyle='--', alpha=0.8, label='MCMC Depth')
     
     axes[i].set_title(f'Station {i+1}')
-    axes[i].legend(loc='upper right')
-    axes[i].grid(True)
+    # Placement de la légende à l'extérieur ou en haut à droite
+    axes[i].legend(loc='upper right', bbox_to_anchor=(1.15, 1.05), fontsize='small')
+    axes[i].grid(True, linestyle=':', alpha=0.6)
 
 axes[-1].set_xlabel('Time')
 plt.tight_layout()

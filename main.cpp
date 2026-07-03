@@ -7,7 +7,7 @@ int main() {
 
     //visualiser avec viz2.py
     //Corriger adresse de G
-
+    
     #pragma region model
     /*
     -----------------------------------------------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ int main() {
 
 
     for (int i=0; i<NSubFaults ; i++){
-            pP.emplace_back(0.4, 2/0.4, 1,  0.08/0.4 );
+            pP.emplace_back(0.4, std::exp(2/0.4)* 1,  0.08/0.4 );
         }
     
 
@@ -105,27 +105,36 @@ int main() {
     //PT_param ParametersPT(0, 10.0, 0.1, 3.0, 0.0, 1000.0, 0.0, 20.0, 100.0, 10, 4);
 
     
+    
     Bounds_Param bds(
         0.001, 5.0, //a_sigma/k
-        0.0, 0.5,    // Dtau_asigma 
-        0.1, 10,  //V_V
-        1e-6f, 1, //big param
-        10000.0, 6, 1,
-        100000
+        1e-6f, 1000,  //super_big_param
+        1e-6f, 1,      //big_param
+        10000.0, 100, 100/4,
+        500000
     );
 
-    std ::vector<Easy_Param> best_model  = inversion_easy_PT(500000, bds,  RES_matrix, t_list, G , 234) ; 
+    
 
 
     double timeStart = omp_get_wtime();
     //std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
     //std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
     //std::vector<Param> best_model = SA(5000, 20 ,t_list, RES_matrix, G, ParametersPT, 0.0099) ;
+    std::vector<Easy_Param> best_model  = inversion_easy_PT(2000000, bds,  RES_matrix, t_list, G , 234) ; 
 
 
     double timeEnd = omp_get_wtime();
     double timeTotal = timeEnd - timeStart;
     std::cout<<"\ntemps total : "<<int(timeTotal)<<" s ";
+
+    std::cout<<"\n Param_initiaux : ("<< pP[0].a_sigma_k<<" , "<< pP[0].super_big_param<< " , "<<pP[0].big_param<<" ) ";
+    
+    for (int j=0; j<NSubFaults; j++){
+        Easy_Param little_param = best_model[j];
+        std::cout<<"\n Param_best     : (" <<little_param.a_sigma_k<<" , "<< little_param.super_big_param<< " , "<<little_param.big_param<<" ) ";
+    }
+
 
 
     #pragma region export_best_model
@@ -135,9 +144,8 @@ int main() {
                         EXPORT BEST MCMC MODEL
     -------------------------------------------------------------------------------------------------------------------
     */
-    /*
-    surface_response(best_model, t_list, Faille, G, RES_matrix, storage_matrix);
-
+    
+    direct(t_list, best_model, G, RES_matrix, storage_matrix) ; 
     std::ofstream pred_file("best_results.csv"); 
     if (pred_file.is_open()) {
         
@@ -160,7 +168,7 @@ int main() {
     } else {
         std::cerr << "Error : Cannot creat bestmodelfile\n";
     }
-        */
+        
 
     #pragma endregion
     
