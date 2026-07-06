@@ -16,7 +16,7 @@ int main() {
     */
     Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
     //adresse de G
-    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_4x4subfault_12statsions.txt");
+    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_4x8subfault_12statsions.txt");
     if (!file.is_open()) {
         std::cerr << "Error : Open file." << std::endl;
         return 1;
@@ -111,7 +111,7 @@ int main() {
         1e-6f, 1000,  //super_big_param
         1e-6f, 1,      //big_param
         10000.0, 100, 100/4,
-        15000
+        50000*3/2*0.2
     );
 
     
