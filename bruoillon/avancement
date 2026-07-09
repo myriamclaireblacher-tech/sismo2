@@ -37,3 +37,9 @@ L'algorithme a du mal à trouver pour 4 sous failles (temps de calcul + converge
 difficile vers les paramètres. Observations expliquent suffisament mais loin du bon modèle).
 Problème plus simple (steady state) pour commencer. 
 Idée : swaps de certains paramètres/sous failles/blocs seulement
+
+Rapport du 08/07
+Implémentation des swaps de blocs.
+Algo beaucoup plus lent à cause de la phase single qui recalcule les llk (casse presque l'intérêt du parallélisme).
+Paires de swap préselectionnées (toujours aléatoires).
+Rapport : checker la théories des swap (demande symétrie de paire?).

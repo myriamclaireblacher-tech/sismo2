@@ -16,7 +16,7 @@ int main() {
     */
     Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
     //adresse de G
-    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_8x16subfault_12statsions.txt");
+    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_4x8subfault_12statsions.txt");
     if (!file.is_open()) {
         std::cerr << "Error : Open file." << std::endl;
         return 1;
@@ -111,7 +111,7 @@ int main() {
         1e-6f, 1000,  //super_big_param
         1e-6f, 1,      //big_param
         10000.0, 100, 100/4,
-        50000*3/2*0.2
+        50000*3/2*0.2/2
     );
 
     
@@ -121,7 +121,7 @@ int main() {
     //std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
     //std::vector<Param> best_model = parallel_tempering_lapl2(500000, ParametersPT, G, RES_matrix, t_list, 42, false) ;
     //std::vector<Param> best_model = SA(5000, 20 ,t_list, RES_matrix, G, ParametersPT, 0.0099) ;
-    std::vector<Easy_Param> best_model  = inversion_easy_PT_sigmas(50000*3/2*0.2, bds,  RES_matrix, t_list, G , 234) ; 
+    std::vector<Easy_Param> best_model  = inversion_easy_PT_swap(50000*3/2, bds,  RES_matrix, t_list, G , 234) ; 
 
 
     double timeEnd = omp_get_wtime();
