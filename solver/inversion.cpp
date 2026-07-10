@@ -296,7 +296,7 @@ std::vector<Param> parallel_tempering_corrected(const int maxint,  const PT_para
 
     //store the models of the cold chains
     
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
         savers.emplace_back(i);
     }}
@@ -571,13 +571,13 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
 
     //store the models of the cold chains
     
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
     else{
     for (int i = 0; i < PT.ncold; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
 
 
@@ -593,7 +593,7 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
     //Create storage space for each CPU
     std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
     for (int t = 0; t < NCPU; ++t) {
-        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+        workspaces.push_back(std::unique_ptr<ThreadWorkspace>(new ThreadWorkspace(t_list.size())));
     }
 
 
@@ -648,9 +648,9 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
             llk[j]=llk_i;
             if (hotchains)
             {
-               savers[j].save_step(work.pP, llk_i);
+               savers[j]->save_step(work.pP, llk_i);
             }
-            else {if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);}
+            else {if (j<PT.ncold) savers[j]->save_step(work.pP, llk_i);}
 
 
         }
@@ -826,8 +826,8 @@ std::vector<Param> parallel_tempering_2sf(const int maxint,  const PT_param PT, 
                     accepts_chain[ichain]++;
                 }
 
-                if (hotchains) savers[ichain].save_step(work.pP, Enew);
-                else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
+                if (hotchains) savers[ichain]->save_step(work.pP, Enew);
+                else {if (ichain<PT.ncold) savers[ichain]->save_step(work.pP, Enew);}     
                 
                 if ((ichain<PT.ncold) && (llk[ichain]>best_llk) ){
                     #pragma omp critical(update_best_model)
@@ -920,13 +920,13 @@ std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT, 
 
     //store the models of the cold chains
     
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
     else{
     for (int i = 0; i < PT.ncold; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
 
 
@@ -942,7 +942,7 @@ std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT, 
     //Create storage space for each CPU
     std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
     for (int t = 0; t < NCPU; ++t) {
-        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+        workspaces.push_back(std::unique_ptr<ThreadWorkspace>(new ThreadWorkspace(t_list.size())));
     }
 
     std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (PT.nchains);
@@ -1001,9 +1001,9 @@ std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT, 
             llk[j]=llk_i;
             if (hotchains)
             {
-               savers[j].save_step(work.pP, llk_i);
+               savers[j]->save_step(work.pP, llk_i);
             }
-            else {if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);}
+            else {if (j<PT.ncold) savers[j]->save_step(work.pP, llk_i);}
 
 
         }
@@ -1181,8 +1181,8 @@ std::vector<Param> parallel_tempering_opt(const int maxint,  const PT_param PT, 
                     accepts_chain[ichain]++;
                 }
 
-                if (hotchains) savers[ichain].save_step(work.pP, Enew);
-                else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
+                if (hotchains) savers[ichain]->save_step(work.pP, Enew);
+                else {if (ichain<PT.ncold) savers[ichain]->save_step(work.pP, Enew);}     
                 
                 if ((ichain<PT.ncold) && (llk[ichain]>best_llk) ){
                     #pragma omp critical(update_best_model)
@@ -1276,13 +1276,13 @@ std::vector<Param> parallel_tempering_lapl(const int maxint,  const PT_param PT,
 
     //store the models of the cold chains
     
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
     else{
     for (int i = 0; i < PT.ncold; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
 
 
@@ -1298,7 +1298,7 @@ std::vector<Param> parallel_tempering_lapl(const int maxint,  const PT_param PT,
     //Create storage space for each CPU
     std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
     for (int t = 0; t < NCPU; ++t) {
-        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+        workspaces.push_back(std::unique_ptr<ThreadWorkspace>(new ThreadWorkspace(t_list.size())));
     }
 
     std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (PT.nchains);
@@ -1357,9 +1357,9 @@ std::vector<Param> parallel_tempering_lapl(const int maxint,  const PT_param PT,
             llk[j]=llk_i;
             if (hotchains)
             {
-               savers[j].save_step(work.pP, llk_i);
+               savers[j]->save_step(work.pP, llk_i);
             }
-            else {if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);}
+            else {if (j<PT.ncold) savers[j]->save_step(work.pP, llk_i);}
 
 
         }
@@ -1537,8 +1537,8 @@ std::vector<Param> parallel_tempering_lapl(const int maxint,  const PT_param PT,
                     accepts_chain[ichain]++;
                 }
 
-                if (hotchains) savers[ichain].save_step(work.pP, Enew);
-                else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
+                if (hotchains) savers[ichain]->save_step(work.pP, Enew);
+                else {if (ichain<PT.ncold) savers[ichain]->save_step(work.pP, Enew);}     
                 
                 if ((ichain<PT.ncold) && (llk[ichain]>best_llk) ){
                     #pragma omp critical(update_best_model)
@@ -1633,13 +1633,13 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
 
     //store the models of the cold chains
     
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     if (hotchains){for (int i = 0; i < PT.nchains; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
     else{
     for (int i = 0; i < PT.ncold; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ColdChainSaver>(new ColdChainSaver(i)));
     }}
 
 
@@ -1655,7 +1655,7 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
     //Create storage space for each CPU
     std::vector<std::unique_ptr<ThreadWorkspace>> workspaces;
     for (int t = 0; t < NCPU; ++t) {
-        workspaces.push_back(std::make_unique<ThreadWorkspace>(t_list.size()));
+        workspaces.push_back(std::unique_ptr<ThreadWorkspace>(new ThreadWorkspace(t_list.size())));
     }
 
     std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (PT.nchains);
@@ -1717,9 +1717,9 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
             llk[j]=llk_i;
             if (hotchains)
             {
-               savers[j].save_step(work.pP, llk_i);
+               savers[j]->save_step(work.pP, llk_i);
             }
-            else {if (j<PT.ncold) savers[j].save_step(work.pP, llk_i);}
+            else {if (j<PT.ncold) savers[j]->save_step(work.pP, llk_i);}
 
 
         }
@@ -1912,8 +1912,8 @@ std::vector<Param> parallel_tempering_lapl2(const int maxint,  const PT_param PT
                 }
                 else storage_matrixes[ichain].row(i) = old_line; 
 
-                if (hotchains) savers[ichain].save_step(work.pP, Enew);
-                else {if (ichain<PT.ncold) savers[ichain].save_step(work.pP, Enew);}     
+                if (hotchains) savers[ichain]->save_step(work.pP, Enew);
+                else {if (ichain<PT.ncold) savers[ichain]->save_step(work.pP, Enew);}     
                 
                 if ((ichain<PT.ncold) && (llk[ichain]>best_llk) ){
                     #pragma omp critical(update_best_model)
@@ -2050,7 +2050,7 @@ int parallel_tempering(const int maxint, const PT_param PT, const Eigen::Matrix<
     }
 
     //storage of the models of the cold chains
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     for (int i = 0; i < PT.ncold; ++i) {
         savers.emplace_back(i);
     }
@@ -2221,7 +2221,7 @@ int parallel_tempering_test_out_of_bounds(const int maxint, const PT_param PT, c
     }
 
     //storage of the models of the cold chains
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     for (int i = 0; i < PT.ncold; ++i) {
         savers.emplace_back(i);
     }
@@ -2409,7 +2409,7 @@ int parallel_tempering_miror(const int maxint, const PT_param PT, const Eigen::M
     }
 
     //storage of the models of the cold chains
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     for (int i = 0; i < PT.ncold; ++i) {
         savers.emplace_back(i);
     }
@@ -2628,7 +2628,7 @@ int parallel_tempering_new(const int maxint, const PT_param PT, const Eigen::Mat
     }
 
     //storage of the models of the cold chains
-    std::vector<ColdChainSaver> savers;
+    std::vector<std::unique_ptr<ColdChainSaver>> savers;
     for (int i = 0; i < PT.ncold; ++i) {
         savers.emplace_back(i);
     }

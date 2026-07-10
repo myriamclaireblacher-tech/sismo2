@@ -1,5 +1,5 @@
 #ifndef Easy_PARALLEL_TEMPERING
-#define EasyPARALLEL_TEMPERING
+#define Easy_PARALLEL_TEMPERING
 
 #include "inversion.hpp"
 
@@ -347,7 +347,7 @@ struct ChainSaver {
 };
 
 
-
+/*
 std::vector<Easy_Param> inversion_easy_PT_sigmas(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, int seed ){
 
@@ -901,7 +901,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigmas(int maxint, Bounds_Param bds, E
 }
 
 
-
+*/
 
 std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, int seed ){
@@ -917,9 +917,9 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
 
     std::vector<int> chain_indexes (bds.nchains);
 
-    std::vector<ChainSaver> savers;
+    std::vector<std::unique_ptr<ChainSaver>> savers;
     for (int i = 0; i < bds.ncold; ++i) {
-        savers.emplace_back(i);
+        savers.push_back(std::unique_ptr<ChainSaver>(new ChainSaver(i)));
     }
 
     int nparam=3;
@@ -985,7 +985,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
             std::copy(P.begin() + (j * NSubFaults), P.begin() + (j+1) * NSubFaults, P_new.begin()) ;
             llk[j] = llk_easy (data, t_list, P_new, G, RES_matrix, storage_matrixes[j]) ;
             if (llk[j]>best_llk) best_llk=llk[j];
-            if (j<bds.ncold) savers[j].save_step(P_new, llk[j]);
+            if (j<bds.ncold) savers[j]->save_step(P_new, llk[j]);
             
         }
 
@@ -1110,7 +1110,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
 
-                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -1442,7 +1442,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
                     }
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
-                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -1779,7 +1779,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
 
-                if (ichain<bds.ncold) savers[ichain].save_step(P_new, llk[ichain]);
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -1913,7 +1913,1077 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
                     std::vector<Eigen::VectorXd> old_lines (8);
                     std::vector<int> indexes (8) ;
                     
+                    for (int l=0; l<4; l++){
+                        old_lines[l]= storage_matrixes[p].row(16*i2 + 4*i1 + l);
+                        indexes[l] = 16*i2 + 4*i1 + l;}
+                    for (int l=4; l<8; l++)
+                        {old_lines[l]= storage_matrixes[p].row(16*i2 + 4*i1 + 4 + l);
+                            indexes[l] = 16*i2 + 4*i1 + 4 + l;
+                        }
+                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 4 , P_new2.begin() + 16*i2 + 4*i1);
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1+8, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 12 , P_new2.begin() + 16*i2 + 4*i1+8);
+
+                    std::vector<Eigen::VectorXd> old_lines2 (8);
+                    
+                    for (int l=0; l<4; l++){
+                        old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + l);
+                    }
+                    for (int l=4; l<8; l++)
+                        {old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + 4 + l);
+                        }
+                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                        
+                    }
+                    else {
+
+                    for (int l=0; l<4; l++){
+                        storage_matrixes[p].row(16*i2 + 4*i1 + l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + l) = old_lines2[l];}
+
+                    for (int l=4; l<8; l++)
+                        {
+                        storage_matrixes[p].row(16*i2 + 4*i1 + 4+  l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + 4+  l) = old_lines2[l];}
+                    }
+                }
+
+                
+
+                else {
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        swap_rate++;
+                        std::swap_ranges(P.begin() + (p * NSubFaults), P.begin() + ((p + 1) * NSubFaults), P.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]); /////////////////////////ici
+                    }
+                }
+                
+            }}
+
+            
+            
+            #pragma endregion
+
+     }
+
+    }
+    #pragma endregion
+
+    
+
+    std::cout<<"\nFinal best llk : "<<best_llk;
+    std::cout<<"\n swap every "<<maxint*NSubFaults/(swap_rate*1.0/bds.ncold)<<"   iterations for cold chains";
+    
+    return best_model ; 
+}
+
+
+std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
+    const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, int seed ){
+
+    #pragma region initializing
+
+    //-------------------------------------------------------------------------------------------------
+    int swap_rate=0;
+    std::vector<int> neighbour_swap (bds.nchains, 0);
+    std::vector<int> subfault_index(NSubFaults);
+    std::vector<double> accepts_chain(bds.nchains) ;
+    //--------------------------------------------------------------------------------------------------
+
+    std::cout<<"\n probas : "
+    std::vector<double> probas(n_m) ;
+    probas[0]=0.7;
+    int cumsum = 0.7 ;
+    for (int g=1; g<n_m-1; g++) {probas[g] = ( 1.0 - cumsum ) * 0.7; std:: cout <<"\n "<< probas[g] ;  cumsum += ( 1.0 - cumsum ) * 0.7 ; probas[g]+=cumsum }
+    probas [n_m- 1] = 1.0-cumsum ;
+    
+    std::vector<int> chain_indexes (bds.nchains);
+
+    std::vector<std::unique_ptr<ChainSaver>> savers;
+    for (int i = 0; i < bds.ncold; ++i) {
+        savers.push_back(std::unique_ptr<ChainSaver>(new ChainSaver(i)));
+    }
+
+    int nparam=3;
+    int param_num=0;
+
+    std::vector<Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor>> storage_matrixes (bds.nchains);
+    for(int c=0; c<bds.nchains; c++){
+                storage_matrixes[c].resize(NSubFaults, t_list.size());
+    }
+
+    int adapt_window=200;
+    std::vector<std::vector<double>> SIGMAS (bds.nchains) ; 
+    for(int c=0; c<bds.nchains; c++){
+                SIGMAS[c]={0.01 , 0.01 , 0.01, 1 };
+    }
+
+    std::vector<Easy_Param> P(bds.nchains*NSubFaults) ;
+
+    double best_llk = -1e9f ;
+    std::vector<double> llk (bds.nchains);
+    std::vector<Easy_Param> best_model (NSubFaults) ;
+
+    double geometric_proba = 1.0 - std::exp(std::log(0.5)/1) ;
+
+    std::vector<int> sfindex(bds.nchains, 0) ;
+    
+
+    std::vector<double> T (bds.nchains) ;
+    for (int i=0;i<bds.nchains;i++){
+        if (i<bds.ncold) T[i]=1.0 ;
+        //loi de puissance
+        else T[i]= std :: exp( std::pow((i-bds.ncold+1)*1.0/(bds.nchains-bds.ncold),2.0) * std::log(bds.T) ) ; ///////////////////////:
+        std::cout<< "\nT["<<i<<"] : "<<T[i];
+    }
+    
+    std::uniform_int_distribution<int> rand_chain(0, bds.nchains - 1); 
+
+    #pragma endregion
+    
+    #pragma omp parallel
+    {
+        #pragma region model_i
+        Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix(3*Nstations, t_list.size());
+        
+
+        std::mt19937 gen(seed+omp_get_thread_num());
+        std::uniform_int_distribution<int> random_index(0, NSubFaults-1); 
+        std::uniform_real_distribution<double> unif_dist_plus(-1.0 , 1.0);
+        std::uniform_real_distribution<double> unif_dist_intern(0.0 , 1.0);
+        std::uniform_int_distribution<int> random_param(0, nparam-1);
+        std::uniform_int_distribution<int> rand_n(n_m) ;
+        std::uniform_int_distribution<int> rand_m(m_n) ; 
+
+        #pragma omp single
+        {
+
+        for (int j=0; j<bds.nchains * NSubFaults ; j++){
+                double p1 = unif_dist_intern (gen) * (bds.a_sigma_k_sup -bds.a_sigma_k_inf) + bds.a_sigma_k_inf;
+                double p2 = unif_dist_intern(gen) *(bds.super_big_param_sup- bds.super_big_param_inf) + bds.super_big_param_inf ;
+                double p4 = unif_dist_intern(gen) * (bds.big_param_sup - bds.big_param_inf ) + bds.big_param_inf ;
+                P[j] = Easy_Param(p1, p2, p4); }
+        
+        for (int j=0; j<bds.nchains; j++){
+            std::vector<Easy_Param> P_new (NSubFaults);
+            std::copy(P.begin() + (j * NSubFaults), P.begin() + (j+1) * NSubFaults, P_new.begin()) ;
+            llk[j] = llk_easy (data, t_list, P_new, G, RES_matrix, storage_matrixes[j]) ;
+            if (llk[j]>best_llk) best_llk=llk[j];
+            if (j<bds.ncold) savers[j]->save_step(P_new, llk[j]);
+            
+        }
+
+        std::cout<<"\n best  initial llk : "<<best_llk ;
+
+        
+
+        
+        }
+        #pragma endregion
+
+        for (int it=0; it<bds.burn_in*NSubFaults*2/3 ; it++ ){
+
+            #pragma omp single
+            {
+            
+            #pragma region affichage
+
+            if (it > 0 && (it % 100000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(bds.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : (" << SIGMAS[c][0]<<" , "<<SIGMAS[c][1]<<" , "<< SIGMAS[c][2]<< " ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c];}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                }
+            
+
+            #pragma endregion
+
+            
+            #pragma region adaptation 
+            
+            if (it > 0 && it % adapt_window == 0) {
+
+                     
+                std::vector<double> acc_rate (bds.nchains);
+                for (int c = 0; c < bds.nchains; c++) {
+                    acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                    accepts_chain[c] = 0; 
+                }
+                // On adapte uniquement si on est dans la période de Burn-in
+                
+                for (int c = 0; c < bds.nchains; c++) {
+                    //sigma                        
+                    if ((acc_rate[c] < 0.20 ) && (SIGMAS[c][param_num]>1e-7)) {
+                    SIGMAS[c][param_num] *= 0.9 ;
+                    } else if ((acc_rate[c] > 0.30) &&(SIGMAS[c][param_num]<0.1) )  SIGMAS[c][param_num] *= 1.1; 
+                }
+                param_num= random_param(gen) ;
+            }
+            #pragma endregion
+
+            
+            }
+
+            #pragma omp for
+            for (int ichain=0; ichain<bds.nchains ;  ichain++){
+
+                #pragma region new_model
+
+
+                double p = unif_dist_intern(gen);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
+
+                //if (ichain==5) subfault_index[i]++;
+
+
+                std::vector<Easy_Param> P_new (NSubFaults);
+                std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
+
+                //newmodel
+                if (param_num==0){
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0];
+                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
+                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
+                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;}
+
+                else if (param_num==1){
+                double prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1];
+                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
+                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
+                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;}
+
+                else {
+                double prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2];
+                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
+                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
+                else  P_new[i].big_param   =  P_new[i].big_param +  prop;}
+
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
+
+                double Enew = llk_easy_i (i, data, t_list, P_new, G, RES_matrix, storage_matrixes[ichain]);
+                
+                #pragma endregion
+
+                #pragma region acept
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen) );
+                accept = (u <= alpha);
+
+                if (accept){
+                    std::copy(P_new.begin(), P_new.end(), P.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                    if (Enew>best_llk) {
+                        #pragma omp critical (updat_best_model)
+                        {
+                            if (Enew>best_llk) {
+                        best_llk=Enew ;
+                        best_model = P_new ; }}
+                    }
+                }
+                else storage_matrixes[ichain].row(i) = old_line;
+
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+
+                #pragma endregion
+            }
+
+            #pragma region swap
+            #pragma omp single
+            {
+                std::iota(chain_indexes.begin(), chain_indexes.end(), 0);
+                std::shuffle(chain_indexes.begin(), chain_indexes.end(), gen);}
+            
+            //do 2 series of swap to be = to the same number of swap as original algorithm
+            for (int e=0; e<2; e++){
+            #pragma omp for 
+            for (int i=0; i<bds.nchains/2; i++){
+                
+                int p = chain_indexes[2*i];
+                int q = chain_indexes[2*i+1];
+                if ((p == q) ||  (T[p] == T[q])) continue;
+
+                double u = unif_dist_intern(gen) ;
+                int taille ; 
+                for (int b=0 ; b < n_m ; b++ ){
+                    if (u>probas[b]) taille = b ; 
+                }
+
+                if (taille==0){
+                    // Formule théorique du Parallel Tempering
+                    int pP = random_index(gen);
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy( P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + pP, P.begin() + q * NSubFaults +pP + 1 , P_new.begin() + pP);
+
+                    Eigen::VectorXd old_line = storage_matrixes[p].row(pP);
+                    double llk1 = llk_easy_i (pP, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    //copy q model in P_new
+                    std::copy(P.begin() + (q * NSubFaults), P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange p parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + pP, P.begin() + p * NSubFaults +pP + 1 , P_new2.begin() + pP);
+                    Eigen::VectorXd old_line2 = storage_matrixes[q].row(pP);
+                    double llk2 = llk_easy_i (pP, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                    }
+                    else {storage_matrixes[p].row(pP) = old_line;storage_matrixes[q].row(pP) = old_line2;}}
+
+                
+                else if ( taille == n_m ){
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        swap_rate++;
+                        std::swap_ranges(P.begin() + (p * NSubFaults), P.begin() + ((p + 1) * NSubFaults), P.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]); /////////////////////////ici
+                    }
+                }
+ 
+              
+                else  {
+
+                    int i1= rand_n(gen);
+                    int i2 = rand_m(gen);
+                    
+                    k_min = std::max(0, (int)(i2-(taille-1)/2));
+                    k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    std::vector<int> indexes (taille*taille);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
+                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin() + l*n_m +k_max , P_new.begin() + l*m_n + k_min);
+                        for (int k=k_min; k<=k_max ; k++) indexes[l*taille+k] = l*m_n + k_min ;
+                    }
+
+                    std::vector<Eigen::VectorXd> old_lines (taille*taille);
+                    
+                    for (int l=0; l<taille*taille; l++){
+                        old_lines[l]= storage_matrixes[p].row(indexes[l]);
+                        }
+
+                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 4 , P_new2.begin() + 16*i2 + 4*i1);
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1+8, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 12 , P_new2.begin() + 16*i2 + 4*i1+8);
+
+                    std::vector<Eigen::VectorXd> old_lines2 (8);
+                    
+                    for (int l=0; l<4; l++){
+                        old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + l);
+                    }
+                    for (int l=4; l<8; l++)
+                        {old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + 4 + l);
+                        }
+                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                        
+                    }
+                    else {
+
+                    for (int l=0; l<4; l++){
+                        storage_matrixes[p].row(16*i2 + 4*i1 + l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + l) = old_lines2[l];}
+
+                    for (int l=4; l<8; l++)
+                        {
+                        storage_matrixes[p].row(16*i2 + 4*i1 + 4+  l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + 4+  l) = old_lines2[l];}
+                    }
+                }
+
+                
+               
+            }}
+
+            
+            
+            #pragma endregion
+
+        }
+
+
+        #pragma omp single
+        {std::cout<<"\n END OF PHASE 1 ";}
+        for (int it=bds.burn_in*NSubFaults*2/3; it<bds.burn_in*NSubFaults ; it++ ){
+
+            #pragma omp single
+            {
+            
+            #pragma region affichage
+
+            if (it > 0 && (it % 10000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(bds.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma adjust : (" << SIGMAS[c][nparam]<<" ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c];}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                }
+            
+
+            #pragma endregion
+
+            
+            #pragma region adaptation 
+
+            
+
+            if (it > 0 && it % adapt_window == 0) {
+
+                     
+                std::vector<double> acc_rate (bds.nchains);
+                for (int c = 0; c < bds.nchains; c++) {
+                    acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                    accepts_chain[c] = 0; 
+                }
+                // On adapte uniquement si on est dans la période de Burn-in
+                
+                for (int c = 0; c < bds.nchains; c++) {
+                    //sigma                        
+                    if (acc_rate[c] < 0.20 )  {
+                    SIGMAS[c][nparam] *= 0.9 ;
+                    } else if (acc_rate[c] > 0.30)  SIGMAS[c][nparam] *= 1.1; 
+                }
+            #pragma endregion
+
+            }
+            }
+
+            #pragma omp for
+            for (int ichain=0; ichain<bds.nchains ;  ichain++){
+
+                #pragma region new_model
+
+
+                double p = unif_dist_intern(gen);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
+
+                //if (ichain==5) subfault_index[i]++;
+
+
+                std::vector<Easy_Param> P_new (NSubFaults);
+                std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
+
+                //newmodel
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
+                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
+                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
+                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
+                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
+                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
+                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
+
+                double Enew = llk_easy_i (i, data, t_list, P_new, G, RES_matrix, storage_matrixes[ichain]);
+                
+                #pragma endregion
+
+                #pragma region acept
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen) );
+                accept = (u <= alpha);
+
+                if (accept){
+                    std::copy(P_new.begin(), P_new.end(), P.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                    if (Enew>best_llk) {
+                        #pragma omp critical (updat_best_model)
+                        {
+                            if (Enew>best_llk) {
+                        best_llk=Enew ;
+                        best_model = P_new ; }}
+                    }
+                }
+                else storage_matrixes[ichain].row(i) = old_line;
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+
+                #pragma endregion
+            }
+
+            #pragma region swap
+            #pragma omp single
+            {
+                std::iota(chain_indexes.begin(), chain_indexes.end(), 0);
+                std::shuffle(chain_indexes.begin(), chain_indexes.end(), gen);}
+            
+            //do 2 series of swap to be = to the same number of swap as original algorithm
+            for (int e=0; e<2; e++){
+            #pragma omp for 
+            for (int i=0; i<bds.nchains/2; i++){
+                double p0=0.5;
+                double p1=0.25;
+                double p2= 0.25*2/3 ;
+                double p3 = 0.25/3 ;
+                int p = chain_indexes[2*i];
+                int q = chain_indexes[2*i+1];
+                if ((p == q) ||  (T[p] == T[q])) continue;
+                double u = unif_dist_intern(gen) ;
+                if (u<p0){
+                    
+                    
+                    // Formule théorique du Parallel Tempering
+                    int pP = random_index(gen);
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + pP, P.begin() + q * NSubFaults +pP + 1 , P_new.begin() + pP);
+
+                    Eigen::VectorXd old_line = storage_matrixes[p].row(pP);
+                    double llk1 = llk_easy_i (pP, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    //copy q model in P_new
+                    std::copy(P.begin() + (q * NSubFaults), P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange p parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + pP, P.begin() + p * NSubFaults +pP + 1 , P_new2.begin() + pP);
+                    Eigen::VectorXd old_line2 = storage_matrixes[q].row(pP);
+                    double llk2 = llk_easy_i (pP, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                    }
+                    else {storage_matrixes[p].row(pP) = old_line;storage_matrixes[q].row(pP) = old_line2;}}
+
+                else if (u<p1 +p0) {
+
+                    // Formule théorique du Parallel Tempering
+                    int pP = random_index(gen)/2;
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults), P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + 2*pP, P.begin() + q * NSubFaults +2*pP + 2 , P_new.begin() + 2*pP);
+
+                    Eigen::VectorXd old_line = storage_matrixes[p].row(2*pP);
+                    Eigen::VectorXd old_line3 = storage_matrixes[p].row(2*pP+1);
+                    std::vector<int> indexes ={2*pP, 2*pP+1};
+                    double llk1 = llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    //copy q model in P_new
+                    std::copy(P.begin() + (q * NSubFaults), P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange p parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + 2*pP, P.begin() + p * NSubFaults +2*pP + 2 , P_new2.begin() + 2*pP);
+                    Eigen::VectorXd old_line2 = storage_matrixes[q].row(2*pP);
+                    Eigen::VectorXd old_line4 = storage_matrixes[q].row(2*pP+1);
+                    double llk2 = llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                    }
+                    else {storage_matrixes[p].row(2*pP) = old_line;storage_matrixes[q].row(2*pP) = old_line2;
+                        storage_matrixes[p].row(2*pP+1) = old_line3;storage_matrixes[q].row(2*pP+1) = old_line4;}}
+                
+                else if (u<p1 +p2+p0) {
+
+
+                    // Formule théorique du Parallel Tempering
+                    double u= unif_dist_intern(gen) ;
+                    int i1=0;
+                    if (u<0.5) i1=0;
+                    else i1=1;
+                    u= unif_dist_intern(gen);
+                    int i2=0;
+                    if (u<0.5)  i2=0;
+                    else i2=1;
+                    
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + 16*i2 + 4*i1, P.begin() + q * NSubFaults +16*i2 + 4*i1 + 4 , P_new.begin() + 16*i2 + 4*i1);
+                    std::copy(P.begin() + (q * NSubFaults) + 16*i2 + 4*i1+8, P.begin() + q * NSubFaults +16*i2 + 4*i1 + 12 , P_new.begin() + 16*i2 + 4*i1+8);
+
+                    std::vector<Eigen::VectorXd> old_lines (8);
+                    std::vector<int> indexes (8) ;
+                    
                         for (int l=0; l<4; l++){
+                        old_lines[l]= storage_matrixes[p].row(16*i2 + 4*i1 + l);
+                        indexes[l] = 16*i2 + 4*i1 + l;}
+                    for (int l=4; l<8; l++)
+                        {old_lines[l]= storage_matrixes[p].row(16*i2 + 4*i1 + 4 + l);
+                            indexes[l] = 16*i2 + 4*i1 + 4 + l;
+                        }
+                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 4 , P_new2.begin() + 16*i2 + 4*i1);
+                    std::copy(P.begin() + (p * NSubFaults) + 16*i2 + 4*i1+8, P.begin() + p * NSubFaults +16*i2 + 4*i1 + 12 , P_new2.begin() + 16*i2 + 4*i1+8);
+
+                    std::vector<Eigen::VectorXd> old_lines2 (8);
+                    
+                    for (int l=0; l<4; l++){
+                        old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + l);
+                    }
+                    for (int l=4; l<8; l++)
+                        {old_lines2[l]= storage_matrixes[q].row(16*i2 + 4*i1 + 4 + l);
+                        }
+                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                        
+                    }
+                    else {
+
+                    for (int l=0; l<4; l++){
+                        storage_matrixes[p].row(16*i2 + 4*i1 + l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + l) = old_lines2[l];}
+
+                    for (int l=4; l<8; l++)
+                        {
+                        storage_matrixes[p].row(16*i2 + 4*i1 + 4+  l) = old_lines[l];
+                        storage_matrixes[q].row(16*i2 + 4*i1 + 4+  l) = old_lines2[l];}
+                    }
+                }
+
+                
+
+                else {
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        swap_rate++;
+                        std::swap_ranges(P.begin() + (p * NSubFaults), P.begin() + ((p + 1) * NSubFaults), P.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]); /////////////////////////ici
+                    }
+                }
+                
+            }}
+
+            
+            
+            #pragma endregion
+
+       }
+
+
+        #pragma region adapt
+        #pragma omp single
+        {std::cout<<"\n END OF PHASE 2 ";
+        double mean1=0;
+        double mean2=0;
+        double mean3=0;
+        double mean4=0;
+        for (int i=0;i<bds.ncold; i++){
+            mean1+= SIGMAS[i][0];
+            mean2+= SIGMAS[i][1];
+            mean3+= SIGMAS[i][2];
+            mean4+= SIGMAS[i][3];
+        }
+        mean1/=bds.ncold;
+        mean2/=bds.ncold;
+        mean3/=bds.ncold;
+        mean4/=bds.ncold;
+        for (int i=0; i<bds.nchains; i++){
+            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][4] = mean4;}
+            else{SIGMAS[i][0]= mean1*std::sqrt(T[i]);SIGMAS[i][1]= mean2*std::sqrt(T[i]);SIGMAS[i][2]= mean3*std::sqrt(T[i]);SIGMAS[i][3]= mean4*std::sqrt(T[i]); }
+        }
+        #pragma endregion
+
+        
+        }
+        for (int it=bds.burn_in*NSubFaults; it<maxint*NSubFaults ; it++ ){
+
+            #pragma omp single
+            {
+            
+            #pragma region affichage
+
+            if (it > 0 && (it % 10000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(bds.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : (" << SIGMAS[c][0]<<" , "<<SIGMAS[c][1]<<" , "<< SIGMAS[c][2]<<" , "<< SIGMAS[c][3] << " ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c] ;}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                }
+            if (it%adapt_window==0) {for (int c=0; c<bds.nchains; c++) accepts_chain[c]=0 ;}
+            
+
+            #pragma endregion
+
+
+            }
+            
+
+            #pragma omp for
+            for (int ichain=0; ichain<bds.nchains ;  ichain++){
+
+                #pragma region new_model
+
+
+                double p = unif_dist_intern(gen);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
+
+                if (ichain==5) subfault_index[i]++;
+
+
+                std::vector<Easy_Param> P_new (NSubFaults);
+                std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
+
+                //newmodel
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
+                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
+                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+
+                
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
+                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
+                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
+                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
+                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
+                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
+
+                double Enew = llk_easy_i (i, data, t_list, P_new, G, RES_matrix, storage_matrixes[ichain]);
+                
+                #pragma endregion
+
+                #pragma region acept
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen) );
+                accept = (u <= alpha);
+
+                if (accept){
+                    std::copy(P_new.begin(), P_new.end(), P.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                    if (Enew>best_llk) {
+                        #pragma omp critical (updat_best_model)
+                        {
+                            if (Enew>best_llk) {
+                        best_llk=Enew ;
+                        best_model = P_new ; }}
+                    }
+                }
+                else storage_matrixes[ichain].row(i) = old_line;
+
+                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+
+                #pragma endregion
+            }
+
+
+            #pragma region swap
+            #pragma omp single
+            {
+                std::iota(chain_indexes.begin(), chain_indexes.end(), 0);
+                std::shuffle(chain_indexes.begin(), chain_indexes.end(), gen);}
+            
+            //do 2 series of swap to be = to the same number of swap as original algorithm
+            for (int e=0; e<2; e++){
+            #pragma omp for 
+            for (int i=0; i<bds.nchains/2; i++){
+                double p0=0.5;
+                double p1=0.25;
+                double p2= 0.25*2/3 ;
+                double p3 = 0.25/3 ;
+                int p = chain_indexes[2*i];
+                int q = chain_indexes[2*i+1];
+                if ((p == q) ||  (T[p] == T[q])) continue;
+                double u = unif_dist_intern(gen) ;
+                if (u<p0){
+                    
+                    
+                    // Formule théorique du Parallel Tempering
+                    int pP = random_index(gen);
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + pP, P.begin() + q * NSubFaults +pP + 1 , P_new.begin() + pP);
+
+                    Eigen::VectorXd old_line = storage_matrixes[p].row(pP);
+                    double llk1 = llk_easy_i (pP, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    //copy q model in P_new
+                    std::copy(P.begin() + (q * NSubFaults), P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange p parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + pP, P.begin() + p * NSubFaults +pP + 1 , P_new2.begin() + pP);
+                    Eigen::VectorXd old_line2 = storage_matrixes[q].row(pP);
+                    double llk2 = llk_easy_i (pP, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                    }
+                    else {storage_matrixes[p].row(pP) = old_line;storage_matrixes[q].row(pP) = old_line2;}}
+
+                else if (u<p1 +p0) {
+
+                    // Formule théorique du Parallel Tempering
+                    int pP = random_index(gen)/2;
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults), P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + 2*pP, P.begin() + q * NSubFaults +2*pP + 2 , P_new.begin() + 2*pP);
+
+                    Eigen::VectorXd old_line = storage_matrixes[p].row(2*pP);
+                    Eigen::VectorXd old_line3 = storage_matrixes[p].row(2*pP+1);
+                    std::vector<int> indexes ={2*pP, 2*pP+1};
+                    double llk1 = llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+
+
+                    std::vector<Easy_Param> P_new2 (NSubFaults);
+                    //copy q model in P_new
+                    std::copy(P.begin() + (q * NSubFaults), P.begin() + (q+1) * NSubFaults, P_new2.begin());
+                    //exchange p parameters subbfault with p
+                    std::copy(P.begin() + (p * NSubFaults) + 2*pP, P.begin() + p * NSubFaults +2*pP + 2 , P_new2.begin() + 2*pP);
+                    Eigen::VectorXd old_line2 = storage_matrixes[q].row(2*pP);
+                    Eigen::VectorXd old_line4 = storage_matrixes[q].row(2*pP+1);
+                    double llk2 = llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+
+
+                    double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        if ((p<bds.ncold) || (q<bds.ncold))
+                        swap_rate++;
+                        std::copy(P_new.begin() , P_new.end(), P.begin() + (p * NSubFaults));
+                        llk[p]=llk1;
+                        std::copy(P_new2.begin() , P_new2.end(), P.begin() + (q * NSubFaults));
+                        llk[q]=llk2;
+                    }
+                    else {storage_matrixes[p].row(2*pP) = old_line;storage_matrixes[q].row(2*pP) = old_line2;
+                        storage_matrixes[p].row(2*pP+1) = old_line3;storage_matrixes[q].row(2*pP+1) = old_line4;}}
+                
+                else if (u<p1 +p2+p0) {
+
+
+                    // Formule théorique du Parallel Tempering
+                    double u= unif_dist_intern(gen) ;
+                    int i1=0;
+                    if (u<0.5) i1=0;
+                    else i1=1;
+                    u= unif_dist_intern(gen);
+                    int i2=0;
+                    if (u<0.5)  i2=0;
+                    else i2=1;
+                    
+                    std::vector<Easy_Param> P_new (NSubFaults);
+                    //copy p model in P_new
+                    std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
+                    //exchange q parameters subbfault with p
+                    std::copy(P.begin() + (q * NSubFaults) + 16*i2 + 4*i1, P.begin() + q * NSubFaults +16*i2 + 4*i1 + 4 , P_new.begin() + 16*i2 + 4*i1);
+                    std::copy(P.begin() + (q * NSubFaults) + 16*i2 + 4*i1+8, P.begin() + q * NSubFaults +16*i2 + 4*i1 + 12 , P_new.begin() + 16*i2 + 4*i1+8);
+
+                    std::vector<Eigen::VectorXd> old_lines (8);
+                    std::vector<int> indexes (8) ;
+                    
+                    for (int l=0; l<4; l++){
                         old_lines[l]= storage_matrixes[p].row(16*i2 + 4*i1 + l);
                         indexes[l] = 16*i2 + 4*i1 + l;}
                     for (int l=4; l<8; l++)

@@ -99,7 +99,7 @@ import matplotlib.pyplot as plt
 # =============================================================================
 file_pattern = "Easy_chain_cold_*.bin"  
 
-NSubFaults = 16  # Nombre de sous-failles (Grille 4x4)
+NSubFaults = 32  # Nombre de sous-failles (Grille 4x4)
 grid_size = 4    # 4x4
 
 # --- EMPLACEMENTS VIDES POUR LES VALEURS CIBLES (TRUE VALUES) ---
