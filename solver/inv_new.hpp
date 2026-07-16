@@ -49,7 +49,7 @@ void direct(std::vector<sunrealtype> t_list, std::vector<Easy_Param> PT, const E
 }
 
 
-void directii( std::vector<int> indexes, std::vector<sunrealtype> t_list, std::vector<Easy_Param> PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
+void directii( std::vector<int> indexes, const std::vector<sunrealtype> & t_list, std::vector<Easy_Param> & PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix,
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
 
@@ -80,7 +80,7 @@ double llk_easy_i (int index, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>
         return llk ;
     } 
 
-double llk_easy_ii (std::vector<int> indexes, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, std::vector<sunrealtype> t_list, std::vector<Easy_Param> PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
+double llk_easy_ii (std::vector<int> indexes, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype> & t_list, std::vector<Easy_Param> & PT, const Eigen::Matrix<double,3*Nstations,NSubFaults>& G,
     Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& RES_matrix,
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
 
@@ -755,7 +755,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigmas(int maxint, Bounds_Param bds, E
         mean3/=bds.ncold;
         mean4/=bds.ncold;
         for (int i=0; i<bds.nchains; i++){
-            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][4] = mean4;}
+            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][3] = mean4;}
             else{SIGMAS[i][0]= mean1*std::sqrt(T[i]);SIGMAS[i][1]= mean2*std::sqrt(T[i]);SIGMAS[i][2]= mean3*std::sqrt(T[i]);SIGMAS[i][3]= mean4*std::sqrt(T[i]); }
         }
         #pragma endregion
@@ -903,6 +903,7 @@ std::vector<Easy_Param> inversion_easy_PT_sigmas(int maxint, Bounds_Param bds, E
 
 */
 
+/*
 std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
     const Eigen::Matrix<double,3*Nstations,NSubFaults>& G, int seed ){
 
@@ -1681,7 +1682,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
         mean3/=bds.ncold;
         mean4/=bds.ncold;
         for (int i=0; i<bds.nchains; i++){
-            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][4] = mean4;}
+            if (i<bds.ncold){SIGMAS[i][0]= mean1; SIGMAS[i][1]=mean2; SIGMAS[i][2] = mean3; SIGMAS[i][3] = mean4;}
             else{SIGMAS[i][0]= mean1*std::sqrt(T[i]);SIGMAS[i][1]= mean2*std::sqrt(T[i]);SIGMAS[i][2]= mean3*std::sqrt(T[i]);SIGMAS[i][3]= mean4*std::sqrt(T[i]); }
         }
         #pragma endregion
@@ -2010,6 +2011,7 @@ std::vector<Easy_Param> inversion_easy_PT_swap(int maxint, Bounds_Param bds, Eig
     
     return best_model ; 
 }
+*/
 
 
 std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds, Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic>& data, const std::vector<sunrealtype>& t_list, 
@@ -2030,7 +2032,7 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
     int o=0;
     for (int j=0 ; j< tailles.size(); j++){
         if (tailles[j]<n_m )
-        new_taille[o] = tailles[j]; o++;
+        {new_taille[o] = tailles[j]; o++;}
     }
 
     if (std::find(new_taille.begin(), new_taille.end(), n_m) != new_taille.end()){ new_taille[o] = n_m;}
@@ -2141,7 +2143,8 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
         }
         #pragma endregion
 
-        for (int it=0; it<bds.burn_in*NSubFaults*2/3 ; it++ ){
+
+        for (int it=0 ; it<bds.burn_in*NSubFaults*1/3 ; it++ ){
 
             #pragma omp single
             {
@@ -2208,23 +2211,27 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                 std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
 
                 //newmodel
-                if (param_num==0){
-                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0];
-                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
-                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
-                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;}
+                auto reflect_bounds = [](double val, double bound_inf, double bound_sup) {
+                    // Tant que la valeur est en dehors des limites, on la fait rebondir
+                    while (val < bound_inf || val > bound_sup) {
+                        if (val > bound_sup) {
+                            val = 2.0 * bound_sup - val;
+                        } else if (val < bound_inf) {
+                            val = 2.0 * bound_inf - val;
+                        }
+                    }
+                    return val;
+                };
 
-                else if (param_num==1){
-                double prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1];
-                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
-                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
-                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;}
+                // 2. On génère le nouveau modèle
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup - bds.a_sigma_k_inf) * SIGMAS[ichain][0] ;
+                P_new[i].a_sigma_k = reflect_bounds(P_new[i].a_sigma_k + prop, bds.a_sigma_k_inf, bds.a_sigma_k_sup);
 
-                else {
-                double prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2];
-                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
-                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
-                else  P_new[i].big_param   =  P_new[i].big_param +  prop;}
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup - bds.super_big_param_inf) * SIGMAS[ichain][1] ;
+                P_new[i].super_big_param = reflect_bounds(P_new[i].super_big_param + prop, bds.super_big_param_inf, bds.super_big_param_sup);
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup - bds.big_param_inf) * SIGMAS[ichain][2] ;
+                P_new[i].big_param = reflect_bounds(P_new[i].big_param + prop, bds.big_param_inf, bds.big_param_sup);
 
                 Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
 
@@ -2254,7 +2261,166 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
 
-                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+                if ((ichain<bds.ncold)&&(it%500)) savers[ichain]->save_step(P_new, llk[ichain]);
+
+                #pragma endregion
+            }
+
+            #pragma region swap
+            #pragma omp single
+            {
+                for (int hey=0; hey<2; hey++){
+                for (int s = 0; s < bds.nchains - 1; s++) {
+                    int p = rand_chain(gen);
+                    int q = rand_chain(gen);
+                    if ((p == q) ||  (T[p] == T[q])) continue;
+
+                    // Formule théorique du Parallel Tempering
+                    double alpha_swap = std::min(0.0, (1.0/T[p] - 1.0/T[q]) * (llk[q] - llk[p]));
+                    double u_swap     = std::log(unif_dist_intern(gen));
+                    //swap_try[p]++;
+                    //swap_try[q]++;
+
+                    if (u_swap <= alpha_swap) {
+                        //swap_rate[p]++;
+                        //swap_rate[q]++;
+                        swap_rate++;
+                        std::swap_ranges(P.begin() + (p * NSubFaults), P.begin() + ((p + 1) * NSubFaults), P.begin() + (q * NSubFaults));
+                        std::swap(llk[p], llk[q]);
+                        std::swap(storage_matrixes[p], storage_matrixes[q]); /////////////////////////ici
+                    }
+            }}}
+
+            
+            
+            #pragma endregion
+
+        }
+
+
+        #pragma omp single
+        {std::cout<<"\n END OF PHASE 0 ";}
+
+
+
+        for (int it=bds.burn_in*NSubFaults*1/3; it<bds.burn_in*NSubFaults*2/3 ; it++ ){
+
+            #pragma omp single
+            {
+            
+            #pragma region affichage
+
+            if (it > 0 && (it % 100000 == 0) ) {
+                    std::cout <<"\n"<< std::setw(3) << (100 * it / (maxint*NSubFaults)) << "% done" << std::endl;
+                    for (int c = 0; c < std::min(bds.nchains,6); c++) {
+                        std::cout << "\nChain " << c 
+                                  << " -> Accept : " << 100.0 * accepts_chain[c] / adapt_window << " %"
+                                  << " |  sigma : (" << SIGMAS[c][0]<<" , "<<SIGMAS[c][1]<<" , "<< SIGMAS[c][2]<< " ) "
+                                  << " |  T : " << T[c] << " | llk : "<<llk[c];}
+
+                    //if  (swap_try[c]!=0)   std::cout  << " |  swap : "<< 100.0 * swap_rate[c] / swap_try[c] <<" % ";}
+                    std::cout
+                              << "  \nBest llk: " << best_llk << std::endl;
+                    
+                }
+            
+
+            #pragma endregion
+
+            
+            #pragma region adaptation 
+            
+            if (it > 0 && it % adapt_window == 0) {
+
+                     
+                std::vector<double> acc_rate (bds.nchains);
+                for (int c = 0; c < bds.nchains; c++) {
+                    acc_rate[c] = (double)accepts_chain[c] / adapt_window;
+                    accepts_chain[c] = 0; 
+                }
+                // On adapte uniquement si on est dans la période de Burn-in
+                
+                for (int c = 0; c < bds.nchains; c++) {
+                    //sigma                        
+                    if ((acc_rate[c] < 0.20 ) && (SIGMAS[c][param_num]>1e-7)) {
+                    SIGMAS[c][param_num] *= 0.9 ;
+                    } else if ((acc_rate[c] > 0.30) &&(SIGMAS[c][param_num]<0.1) )  SIGMAS[c][param_num] *= 1.1; 
+                }
+                param_num= random_param(gen) ;
+            }
+            #pragma endregion
+
+            
+            }
+
+            #pragma omp for
+            for (int ichain=0; ichain<bds.nchains ;  ichain++){
+
+                #pragma region new_model
+
+
+                double p = unif_dist_intern(gen);
+                int i = sfindex[ichain] ;
+                if (p<geometric_proba) { sfindex[ichain] = random_index(gen) ; i = sfindex[ichain];}
+
+                //if (ichain==5) subfault_index[i]++;
+
+
+                std::vector<Easy_Param> P_new (NSubFaults);
+                std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
+
+                //newmodel
+                auto reflect_bounds = [](double val, double bound_inf, double bound_sup) {
+                    // Tant que la valeur est en dehors des limites, on la fait rebondir
+                    while (val < bound_inf || val > bound_sup) {
+                        if (val > bound_sup) {
+                            val = 2.0 * bound_sup - val;
+                        } else if (val < bound_inf) {
+                            val = 2.0 * bound_inf - val;
+                        }
+                    }
+                    return val;
+                };
+
+                // 2. On génère le nouveau modèle
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup - bds.a_sigma_k_inf) * SIGMAS[ichain][0] ;
+                P_new[i].a_sigma_k = reflect_bounds(P_new[i].a_sigma_k + prop, bds.a_sigma_k_inf, bds.a_sigma_k_sup);
+
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup - bds.super_big_param_inf) * SIGMAS[ichain][1]  ;
+                P_new[i].super_big_param = reflect_bounds(P_new[i].super_big_param + prop, bds.super_big_param_inf, bds.super_big_param_sup);
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup - bds.big_param_inf) * SIGMAS[ichain][2] ;
+                P_new[i].big_param = reflect_bounds(P_new[i].big_param + prop, bds.big_param_inf, bds.big_param_sup);
+
+                Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
+
+                double Enew = llk_easy_i (i, data, t_list, P_new, G, RES_matrix, storage_matrixes[ichain]);
+                
+                #pragma endregion
+
+                #pragma region acept
+
+                bool accept = false ;
+                double delta  = (Enew - llk[ichain])/T[ichain] ;
+                double alpha  = std::min(0.0, delta);
+                double u      = std::log(unif_dist_intern(gen) );
+                accept = (u <= alpha);
+
+                if (accept){
+                    std::copy(P_new.begin(), P_new.end(), P.begin() + (ichain * NSubFaults));
+                    llk[ichain] = Enew;
+                    accepts_chain[ichain]++;
+                    if (Enew>best_llk) {
+                        #pragma omp critical (updat_best_model)
+                        {
+                            if (Enew>best_llk) {
+                        best_llk=Enew ;
+                        best_model = P_new ; }}
+                    }
+                }
+                else storage_matrixes[ichain].row(i) = old_line;
+
+                if ((ichain<bds.ncold)&&(it%500)) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -2346,43 +2512,53 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     int i1= rand_n(gen);
                     int i2 = rand_m(gen);
                     
-                    double k_min = std::max(0, (int)(i2-(taille-1)/2));
-                    double k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
+                    int k_min = std::max(0, (int)(i2-(taille-1)/2));
+                    int k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
                     std::vector<Easy_Param> P_new (NSubFaults);
-                    std::vector<int> indexes (taille*taille);
+                    std::vector<int> indexes (taille*taille, -1);
                     //copy p model in P_new
                     std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max , P_new.begin() + l*m_n + k_min);
-                        for (int k=k_min; k<=k_max ; k++) indexes[l*taille+k] = l*m_n + k_min ;
+                    int ccount=0;
+                    int l_min = std::max(0, i1 - (taille-1)/2);
+                    int l_max  = std::min(n_m-1, i1 + (taille-1)/2 ) ; 
+
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max + 1 , P_new.begin() + l*m_n + k_min);
+                        for (int k=k_min; k<=k_max ; k++) {indexes[(l-l_min)*taille+(k-k_min)] = l*m_n + k; ccount++ ;} ;
                     }
 
                     std::vector<Eigen::VectorXd> old_lines (taille*taille);
                     
+                    std::vector<int> real_indexes (ccount);
+                    int ind=0;
                     for (int l=0; l<taille*taille; l++){
-                        old_lines[l]= storage_matrixes[p].row(indexes[l]);
+                        if (indexes[l]!=-1){real_indexes[ind] = indexes[l] ; ind++;
+                        old_lines[l]= storage_matrixes[p].row(indexes[l]);}
                         }
+                    
+                    
 
-                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+                    double llk1=llk_easy_ii (real_indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
 
                     
                     std::vector<Easy_Param> P_new2 (NSubFaults);
                     //copy p model in P_new
                     std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max , P_new2.begin() + l*m_n + k_min);
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max +1, P_new2.begin() + l*m_n + k_min);
                         
                     }
 
                     std::vector<Eigen::VectorXd> old_lines2 (taille*taille);
                     
                     for (int l=0; l<taille*taille; l++){
-                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);
+                        if (indexes[l]!=-1){
+                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);}
                         }
 
-                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+                    double llk2=llk_easy_ii (real_indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
 
 
                     double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
@@ -2401,8 +2577,9 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     else {
 
                     for (int l=0; l<taille*taille; l++){
+                        if (indexes[l]!=-1) {
                         storage_matrixes[p].row(indexes[l]) = old_lines[l];
-                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];}
+                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];} }
                 }
 
                 
@@ -2461,7 +2638,7 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     //sigma                        
                     if (acc_rate[c] < 0.20 )  {
                     SIGMAS[c][nparam] *= 0.9 ;
-                    } else if (acc_rate[c] > 0.30)  SIGMAS[c][nparam] *= 1.1; 
+                    } else if ((acc_rate[c] > 0.30) && SIGMAS[c][nparam]<0.95 )  SIGMAS[c][nparam] *= 1.1; 
                 }
             #pragma endregion
 
@@ -2485,20 +2662,29 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                 std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
 
                 //newmodel
-                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
-                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
-                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+                auto reflect_bounds = [](double val, double bound_inf, double bound_sup) {
+                    // Tant que la valeur est en dehors des limites, on la fait rebondir
+                    while (val < bound_inf || val > bound_sup) {
+                        if (val > bound_sup) {
+                            val = 2.0 * bound_sup - val;
+                        } else if (val < bound_inf) {
+                            val = 2.0 * bound_inf - val;
+                        }
+                    }
+                    return val;
+                };
 
-                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
-                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
-                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+                // 2. On génère le nouveau modèle
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup - bds.a_sigma_k_inf) * SIGMAS[ichain][0] * SIGMAS[ichain][3];
+                P_new[i].a_sigma_k = reflect_bounds(P_new[i].a_sigma_k + prop, bds.a_sigma_k_inf, bds.a_sigma_k_sup);
 
-                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
-                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
-                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup - bds.super_big_param_inf) * SIGMAS[ichain][1] * SIGMAS[ichain][3];
+                P_new[i].super_big_param = reflect_bounds(P_new[i].super_big_param + prop, bds.super_big_param_inf, bds.super_big_param_sup);
+
+                prop = unif_dist_plus(gen) * (bds.big_param_sup - bds.big_param_inf) * SIGMAS[ichain][2] * SIGMAS[ichain][3];
+                P_new[i].big_param = reflect_bounds(P_new[i].big_param + prop, bds.big_param_inf, bds.big_param_sup);
+
+
 
                 Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
 
@@ -2527,7 +2713,7 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     }
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
-                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+                if ((ichain<bds.ncold)&&(it%500)) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -2619,43 +2805,53 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     int i1= rand_n(gen);
                     int i2 = rand_m(gen);
                     
-                    double k_min = std::max(0, (int)(i2-(taille-1)/2));
-                    double k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
+                    int k_min = std::max(0, (int)(i2-(taille-1)/2));
+                    int k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
                     std::vector<Easy_Param> P_new (NSubFaults);
-                    std::vector<int> indexes (taille*taille);
+                    std::vector<int> indexes (taille*taille, -1);
                     //copy p model in P_new
                     std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max , P_new.begin() + l*m_n + k_min);
-                        for (int k=k_min; k<=k_max ; k++) indexes[l*taille+k] = l*m_n + k_min ;
+                    int ccount=0;
+                    int l_min = std::max(0, i1 - (taille-1)/2);
+                    int l_max  = std::min(n_m-1, i1 + (taille-1)/2 ) ; 
+
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max + 1 , P_new.begin() + l*m_n + k_min);
+                        for (int k=k_min; k<=k_max ; k++) {indexes[(l-l_min)*taille+(k-k_min)] = l*m_n + k; ccount++ ;} ;
                     }
 
                     std::vector<Eigen::VectorXd> old_lines (taille*taille);
                     
+                    std::vector<int> real_indexes (ccount);
+                    int ind=0;
                     for (int l=0; l<taille*taille; l++){
-                        old_lines[l]= storage_matrixes[p].row(indexes[l]);
+                        if (indexes[l]!=-1){real_indexes[ind] = indexes[l] ; ind++;
+                        old_lines[l]= storage_matrixes[p].row(indexes[l]);}
                         }
+                    
+                    
 
-                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+                    double llk1=llk_easy_ii (real_indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
 
                     
                     std::vector<Easy_Param> P_new2 (NSubFaults);
                     //copy p model in P_new
                     std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max , P_new2.begin() + l*m_n + k_min);
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max +1, P_new2.begin() + l*m_n + k_min);
                         
                     }
 
                     std::vector<Eigen::VectorXd> old_lines2 (taille*taille);
                     
                     for (int l=0; l<taille*taille; l++){
-                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);
+                        if (indexes[l]!=-1){
+                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);}
                         }
 
-                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+                    double llk2=llk_easy_ii (real_indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
 
 
                     double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
@@ -2674,8 +2870,9 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     else {
 
                     for (int l=0; l<taille*taille; l++){
+                        if (indexes[l]!=-1) {
                         storage_matrixes[p].row(indexes[l]) = old_lines[l];
-                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];}
+                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];} }
                 }
 
                 
@@ -2760,22 +2957,27 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                 std::copy(P.begin() + (ichain * NSubFaults), P.begin() + (ichain+1) * NSubFaults, P_new.begin());
 
                 //newmodel
-                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup   - bds.a_sigma_k_inf) * SIGMAS[ichain][0]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].a_sigma_k > bds.a_sigma_k_sup)   P_new[i].a_sigma_k = 2 * bds.a_sigma_k_sup - P_new[i].a_sigma_k - prop ; 
-                else if (prop + P_new[i].a_sigma_k < bds.a_sigma_k_inf)  P_new[i].a_sigma_k = 2 * bds.a_sigma_k_inf - P_new[i].a_sigma_k - prop ;
-                else  P_new[i].a_sigma_k   =  P_new[i].a_sigma_k +  prop;
+                auto reflect_bounds = [](double val, double bound_inf, double bound_sup) {
+                    // Tant que la valeur est en dehors des limites, on la fait rebondir
+                    while (val < bound_inf || val > bound_sup) {
+                        if (val > bound_sup) {
+                            val = 2.0 * bound_sup - val;
+                        } else if (val < bound_inf) {
+                            val = 2.0 * bound_inf - val;
+                        }
+                    }
+                    return val;
+                };
 
-                
-                prop = unif_dist_plus(gen) * (bds.super_big_param_sup   - bds.super_big_param_inf) * SIGMAS[ichain][1]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].super_big_param > bds.super_big_param_sup)   P_new[i].super_big_param = 2 * bds.super_big_param_sup - P_new[i].super_big_param - prop ; 
-                else if (prop + P_new[i].super_big_param < bds.super_big_param_inf)  P_new[i].super_big_param = 2 * bds.super_big_param_inf - P_new[i].super_big_param - prop ;
-                else  P_new[i].super_big_param   =  P_new[i].super_big_param +  prop;
+                // 2. On génère le nouveau modèle
+                double prop = unif_dist_plus(gen) * (bds.a_sigma_k_sup - bds.a_sigma_k_inf) * SIGMAS[ichain][0] * SIGMAS[ichain][nparam];
+                P_new[i].a_sigma_k = reflect_bounds(P_new[i].a_sigma_k + prop, bds.a_sigma_k_inf, bds.a_sigma_k_sup);
 
+                prop = unif_dist_plus(gen) * (bds.super_big_param_sup - bds.super_big_param_inf) * SIGMAS[ichain][1] * SIGMAS[ichain][nparam];
+                P_new[i].super_big_param = reflect_bounds(P_new[i].super_big_param + prop, bds.super_big_param_inf, bds.super_big_param_sup);
 
-                prop = unif_dist_plus(gen) * (bds.big_param_sup   - bds.big_param_inf) * SIGMAS[ichain][2]*SIGMAS[ichain][nparam];
-                if (prop + P_new[i].big_param > bds.big_param_sup)   P_new[i].big_param = 2 * bds.big_param_sup - P_new[i].big_param - prop ; 
-                else if (prop + P_new[i].big_param < bds.big_param_inf)  P_new[i].big_param = 2 * bds.big_param_inf - P_new[i].big_param - prop ;
-                else  P_new[i].big_param   =  P_new[i].big_param +  prop;
+                prop = unif_dist_plus(gen) * (bds.big_param_sup - bds.big_param_inf) * SIGMAS[ichain][2] * SIGMAS[ichain][nparam];
+                P_new[i].big_param = reflect_bounds(P_new[i].big_param + prop, bds.big_param_inf, bds.big_param_sup);
 
                 Eigen::VectorXd old_line = storage_matrixes[ichain].row(i);
 
@@ -2805,7 +3007,7 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                 }
                 else storage_matrixes[ichain].row(i) = old_line;
 
-                if (ichain<bds.ncold) savers[ichain]->save_step(P_new, llk[ichain]);
+                if ((ichain<bds.ncold)&&(it%500)) savers[ichain]->save_step(P_new, llk[ichain]);
 
                 #pragma endregion
             }
@@ -2898,43 +3100,53 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     int i1= rand_n(gen);
                     int i2 = rand_m(gen);
                     
-                    double k_min = std::max(0, (int)(i2-(taille-1)/2));
-                    double k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
+                    int k_min = std::max(0, (int)(i2-(taille-1)/2));
+                    int k_max= std::min(m_n-1, (int)(i2+(taille-1)/2));
                     std::vector<Easy_Param> P_new (NSubFaults);
-                    std::vector<int> indexes (taille*taille);
+                    std::vector<int> indexes (taille*taille, -1);
                     //copy p model in P_new
                     std::copy(P.begin() + (p * NSubFaults) , P.begin() + (p+1) * NSubFaults, P_new.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max , P_new.begin() + l*m_n + k_min);
-                        for (int k=k_min; k<=k_max ; k++) indexes[l*taille+k] = l*m_n + k_min ;
+                    int ccount=0;
+                    int l_min = std::max(0, i1 - (taille-1)/2);
+                    int l_max  = std::min(n_m-1, i1 + (taille-1)/2 ) ; 
+
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (q * NSubFaults) + l*m_n + k_min, P.begin()  + (q * NSubFaults)+ l*m_n +k_max + 1 , P_new.begin() + l*m_n + k_min);
+                        for (int k=k_min; k<=k_max ; k++) {indexes[(l-l_min)*taille+(k-k_min)] = l*m_n + k; ccount++ ;} ;
                     }
 
                     std::vector<Eigen::VectorXd> old_lines (taille*taille);
                     
+                    std::vector<int> real_indexes (ccount);
+                    int ind=0;
                     for (int l=0; l<taille*taille; l++){
-                        old_lines[l]= storage_matrixes[p].row(indexes[l]);
+                        if (indexes[l]!=-1){real_indexes[ind] = indexes[l] ; ind++;
+                        old_lines[l]= storage_matrixes[p].row(indexes[l]);}
                         }
+                    
+                    
 
-                    double llk1=llk_easy_ii (indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
+                    double llk1=llk_easy_ii (real_indexes, data, t_list, P_new, G, RES_matrix, storage_matrixes[p]);
 
                     
                     std::vector<Easy_Param> P_new2 (NSubFaults);
                     //copy p model in P_new
                     std::copy(P.begin() + (q * NSubFaults) , P.begin() + (q+1) * NSubFaults, P_new2.begin());
                     //exchange q parameters subbfault with p
-                    for (int l=std::max(0, i1 - (taille-1)/2) ;  l<= std::min(n_m-1, i1 + (taille-1)/2 ) ; l++){
-                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max , P_new2.begin() + l*m_n + k_min);
+                    for (int l=l_min ;  l<= l_max ; l++){
+                        std::copy(P.begin() + (p * NSubFaults) + l*m_n + k_min, P.begin() + (p * NSubFaults) +  l*m_n + k_max +1, P_new2.begin() + l*m_n + k_min);
                         
                     }
 
                     std::vector<Eigen::VectorXd> old_lines2 (taille*taille);
                     
                     for (int l=0; l<taille*taille; l++){
-                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);
+                        if (indexes[l]!=-1){
+                        old_lines2[l]= storage_matrixes[q].row(indexes[l]);}
                         }
 
-                    double llk2=llk_easy_ii (indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
+                    double llk2=llk_easy_ii (real_indexes, data, t_list, P_new2, G, RES_matrix, storage_matrixes[q]);
 
 
                     double alpha_swap = std::min(0.0, (llk1 - llk[p])/T[p] + (llk2 - llk[q])/T[q]);
@@ -2953,8 +3165,9 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
                     else {
 
                     for (int l=0; l<taille*taille; l++){
+                        if (indexes[l]!=-1) {
                         storage_matrixes[p].row(indexes[l]) = old_lines[l];
-                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];}
+                        storage_matrixes[q].row(indexes[l]) = old_lines2[l];} }
                 }
 
                 
@@ -2977,6 +3190,7 @@ std::vector<Easy_Param> inversion_easy_PT_new_swap(int maxint, Bounds_Param bds,
     
     return best_model ; 
 }
+
 
 
 #endif

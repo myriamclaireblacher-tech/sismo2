@@ -99,8 +99,11 @@ import matplotlib.pyplot as plt
 # =============================================================================
 file_pattern = "Easy_chain_cold_*.bin"  
 
-NSubFaults = 32  # Nombre de sous-failles (Grille 4x4)
-grid_size = 4    # 4x4
+NSubFaults = 32  
+# CORRECTION GRILLE 4x8
+grid_rows = 4    
+grid_cols = 8
+grid_size= grid_rows * grid_cols
 
 # --- EMPLACEMENTS VIDES POUR LES VALEURS CIBLES (TRUE VALUES) ---
 # Tu peux mettre soit un seul nombre : 2.5
@@ -114,10 +117,10 @@ param1_min_possible = 0.0
 param1_max_possible = 5  
 
 param2_min_possible = 0.0   
-param2_max_possible = 5.0   
+param2_max_possible = 1000   
 
-param3_min_possible = -2.0  
-param3_max_possible = 2.0   
+param3_min_possible = 0
+param3_max_possible = 1  
 
 param1_inf = 0
 param1_sup = 5
@@ -156,9 +159,11 @@ print(f"Trouvé {len(files_to_analyze)} fichier(s) de chaîne froide à analyser
 
 doubles_per_step = 1 + NSubFaults * 3
 skip_iterations = 15000 * NSubFaults
+thinning = 10 # Garde 1 point sur 10 (Divise la RAM par 10). Augmente à 50 si besoin.
 
-all_llks = []
 all_params_flat = []
+best_llk_value = -np.inf
+best_model_raw = None
 
 for filepath in sorted(files_to_analyze):
     print(f"Traitement de {os.path.basename(filepath)}...")
@@ -171,35 +176,38 @@ for filepath in sorted(files_to_analyze):
         
     data_matrix = raw_data[:total_steps * doubles_per_step].reshape(total_steps, doubles_per_step)
     
-    all_llks.append(data_matrix[skip_iterations:, 0])
-    all_params_flat.append(data_matrix[skip_iterations:, 1:])
+    # Extraction de la LLK post burn-in pour trouver le meilleur modèle local
+    post_burn_llk = data_matrix[skip_iterations:, 0]
+    local_best_idx = np.argmax(post_burn_llk)
+    
+    if post_burn_llk[local_best_idx] > best_llk_value:
+        best_llk_value = post_burn_llk[local_best_idx]
+        best_model_raw = data_matrix[skip_iterations + local_best_idx, 1:]
+    
+    # THINNING : On ne stocke en RAM qu'un échantillon sur 'thinning'
+    all_params_flat.append(data_matrix[skip_iterations::thinning, 1:])
 
-if not all_llks:
+if not all_params_flat:
     raise ValueError("Aucune donnée valide n'a pu être extraite après le burn-in.")
 
-global_llk = np.concatenate(all_llks)
 global_params_flat = np.vstack(all_params_flat)
 
 print(f"\n--- Statistique Globale ---")
-print(f"Nombre total d'échantillons cumulés : {global_llk.shape[0]}")
+print(f"Nombre total d'échantillons conservés pour les histogrammes (après thinning) : {global_params_flat.shape[0]}")
+print(f"Meilleure Vraisemblance (Max LLK) trouvée à la volée : {best_llk_value}")
 
-# EXTRACTION DU MEILLEUR MODÈLE (MAX LLK)
-best_step_idx = np.argmax(global_llk)
-best_llk_value = global_llk[best_step_idx]
-print(f"Meilleure Vraisemblance (Max LLK) trouvée : {best_llk_value}")
+# Formatage du meilleur modèle sur la grille 4x8
+best_model_raw = best_model_raw.reshape(NSubFaults, 3)
+best_grid_p1 = best_model_raw[:, 0].reshape(grid_rows, grid_cols)
+best_grid_p2 = best_model_raw[:, 1].reshape(grid_rows, grid_cols)
+best_grid_p3 = best_model_raw[:, 2].reshape(grid_rows, grid_cols)
 
-best_model_raw = global_params_flat[best_step_idx].reshape(NSubFaults, 3)
-best_grid_p1 = best_model_raw[:, 0].reshape(grid_size, grid_size)
-best_grid_p2 = best_model_raw[:, 1].reshape(grid_size, grid_size)
-best_grid_p3 = best_model_raw[:, 2].reshape(grid_size, grid_size)
-
-# Séparation de l'historique complet pour les plots
+# Séparation de l'historique allégé pour les plots
 params_3d = global_params_flat.reshape(-1, NSubFaults, 3)
 p1_hist_data = params_3d[:, :, 0]
 p2_hist_data = params_3d[:, :, 1]
 p3_hist_data = params_3d[:, :, 2]
 
-# Helper interne pour extraire proprement les cibles scalaires ou vectorielles
 def get_target_val(target, sf_idx):
     if target is None: return None
     return target[sf_idx] if isinstance(target, (list, np.ndarray, tuple)) else target
@@ -218,18 +226,20 @@ hist_bounds = [
 ]
 
 for p_idx, p_name in enumerate(param_names):
-    fig, axes = plt.subplots(grid_size, grid_size, figsize=(11, 11), sharex=False)
+    # Utilisation de grid_rows et grid_cols au lieu de grid_size
+    fig, axes = plt.subplots(grid_rows, grid_cols, figsize=(20, 10), sharex=False)
     fig.suptitle(f"Histogrammes de Densité 1D - Paramètre : {p_name}", fontsize=14, fontweight='bold')
     
     current_data = param_datasets[p_idx]
     current_bounds = hist_bounds[p_idx]
     
     for sf in range(NSubFaults):
-        row, col = sf // grid_size, sf % grid_size
+        # Séparation logique en lignes (4) et colonnes (8)
+        row, col = sf // grid_cols, sf % grid_cols
         ax = axes[row, col]
         
         ax.hist(current_data[:, sf], bins=50, color='skyblue', edgecolor='black', alpha=0.7, density=True)
-        ax.set_title(f"Sous-faille {sf}", fontsize=9)
+        ax.set_title(f"SF {sf}", fontsize=9)
         ax.grid(axis='y', linestyle='--', alpha=0.4)
         
         if current_bounds["min"] is not None or current_bounds["max"] is not None:
@@ -242,73 +252,76 @@ for p_idx, p_name in enumerate(param_names):
         
     plt.tight_layout()
 
-# =============================================================================
-# 4. CORNER PLOTS (HISTOGRAMMES 1D + 2D) POUR 3 SOUS-FAILLES ALÉATOIRES
-# =============================================================================
-np.random.seed(None) 
-selected_subfaults = sorted(np.random.choice(NSubFaults, size=3, replace=False))
-print(f"\nSous-failles sélectionnées aléatoirement pour les plots 2D : {selected_subfaults}")
+    # =============================================================================
+    # 4. CORNER PLOTS (HISTOGRAMMES 1D + 2D) POUR 3 SOUS-FAILLES ALÉATOIRES
+    # =============================================================================
 
-for sf in selected_subfaults:
-    print(f"Génération du Corner Plot : Sous-faille {sf}...")
-    
-    # Données pour la sous-faille courante
-    params_cold = [p1_hist_data[:, sf], p2_hist_data[:, sf], p3_hist_data[:, sf]]
-    
-    # Meilleur modèle localisé
-    best_values = [
-        best_grid_p1[sf // grid_size, sf % grid_size],
-        best_grid_p2[sf // grid_size, sf % grid_size],
-        best_grid_p3[sf // grid_size, sf % grid_size]
-    ]
+    np.random.seed(None) 
+    selected_subfaults = sorted(np.random.choice(NSubFaults, size=3, replace=False))
+    print(f"\nSous-failles sélectionnées aléatoirement pour les plots 2D : {selected_subfaults}")
 
-    # Cibles
-    corner_true_values = [
-        get_target_val(param1_target, sf),
-        get_target_val(param2_target, sf),
-        get_target_val(param3_target, sf)
-    ]
-    corner_param_names = [f"a_sigma_k (SF{sf})", f"super_big_param (SF{sf})", f"big_param (SF{sf})"]
+    for sf in selected_subfaults:
+        print(f"Génération du Corner Plot : Sous-faille {sf}...")
+        
+        # Données pour la sous-faille courante
+        params_cold = [p1_hist_data[:, sf], p2_hist_data[:, sf], p3_hist_data[:, sf]]
+        
+        # CORRECTION : Utilisation de grid_cols (8) au lieu de grid_size (32)
+        best_values = [
+            best_grid_p1[sf // grid_cols, sf % grid_cols],
+            best_grid_p2[sf // grid_cols, sf % grid_cols],
+            best_grid_p3[sf // grid_cols, sf % grid_cols]
+        ]
 
-    fig_corner, axes_corner = plt.subplots(3, 3, figsize=(10, 10))
-    fig_corner.suptitle(f"F{sf} - Corner Plot a posteriori (Max LLK: {best_llk_value:.2f})", fontweight='bold', fontsize=14)
+        # Cibles
+        corner_true_values = [
+            get_target_val(param1_target, sf),
+            get_target_val(param2_target, sf),
+            get_target_val(param3_target, sf)
+        ]
+        corner_param_names = [f"a_sigma_k (SF{sf})", f"super_big_param (SF{sf})", f"big_param (SF{sf})"]
 
-    # Synchronisation 2D matricielle des axes
-    for i in range(3):
-        for j in range(3):
-            if i >= j:
-                if i != j: axes_corner[i, j].sharex(axes_corner[j, j])
-                if i > j and j > 0: axes_corner[i, j].sharey(axes_corner[i, 0])
+        fig_corner, axes_corner = plt.subplots(3, 3, figsize=(10, 10))
+        fig_corner.suptitle(f"F{sf} - Corner Plot a posteriori (Max LLK: {best_llk_value:.2f})", fontweight='bold', fontsize=14)
 
-    # Remplissage du Corner Plot
-    for i in range(3):
-        for j in range(3):
-            ax = axes_corner[i, j]
-            if i == j:  # Diagonale : Marginale 1D
-                ax.hist(params_cold[i], bins=40, color='royalblue', edgecolor='black', alpha=0.7, density=True)
-                if corner_true_values[i] is not None:
-                    ax.axvline(corner_true_values[i], color='red', linestyle='--', linewidth=2.0, label="Cible")
-                ax.axvline(best_values[i], color='darkviolet', linestyle=':', linewidth=2.0, label="Meilleur LLK")
-                if i == 0: ax.legend(fontsize='x-small')
-                
-            elif i > j: # Triangle inférieur : Histogramme 2D
-                ax.hist2d(params_cold[j], params_cold[i], bins=35, cmap='Blues', cmin=1)
-                if corner_true_values[j] is not None and corner_true_values[i] is not None:
-                    ax.plot(corner_true_values[j], corner_true_values[i], marker='+', color='red', markersize=8, markeredgewidth=1.5)
-                ax.plot(best_values[j], best_values[i], marker='x', color='darkviolet', markersize=8, markeredgewidth=1.5)
-                
-            else:       # Triangle supérieur : Vide
-                ax.axis('off')
-                
-            # Formatage des labels (correction fontweight ici)
-            if i == 2: ax.set_xlabel(corner_param_names[j], fontweight='bold', fontsize=10)
-            if j == 0 and i > 0: ax.set_ylabel(corner_param_names[i], fontweight='bold', fontsize=10)
+        # Synchronisation 2D matricielle des axes
+        for i in range(3):
+            for j in range(3):
+                if i >= j:
+                    if i != j: axes_corner[i, j].sharex(axes_corner[j, j])
+                    if i > j and j > 0: axes_corner[i, j].sharey(axes_corner[i, 0])
 
-            # Invisibilité des axes intérieurs redondants
-            if i < 2: ax.tick_params(labelbottom=False)
-            if j > 0 or i == 0: ax.tick_params(labelleft=False)
+        # Remplissage du Corner Plot
+        for i in range(3):
+            for j in range(3):
+                ax = axes_corner[i, j]
+                if i == j:  # Diagonale : Marginale 1D
+                    ax.hist(params_cold[i], bins=40, color='royalblue', edgecolor='black', alpha=0.7, density=True)
+                    if corner_true_values[i] is not None:
+                        ax.axvline(corner_true_values[i], color='red', linestyle='--', linewidth=2.0, label="Cible")
+                    ax.axvline(best_values[i], color='darkviolet', linestyle=':', linewidth=2.0, label="Meilleur LLK")
+                    if i == 0: ax.legend(fontsize='x-small')
+                    
+                elif i > j: # Triangle inférieur : Histogramme 2D
+                    ax.hist2d(params_cold[j], params_cold[i], bins=35, cmap='Blues', cmin=1)
+                    if corner_true_values[j] is not None and corner_true_values[i] is not None:
+                        ax.plot(corner_true_values[j], corner_true_values[i], marker='+', color='red', markersize=8, markeredgewidth=1.5)
+                    ax.plot(best_values[j], best_values[i], marker='x', color='darkviolet', markersize=8, markeredgewidth=1.5)
+                    
+                else:       # Triangle supérieur : Vide
+                    ax.axis('off')
+                    
+                # Formatage des labels
+                if i == 2: ax.set_xlabel(corner_param_names[j], fontweight='bold', fontsize=10)
+                if j == 0 and i > 0: ax.set_ylabel(corner_param_names[i], fontweight='bold', fontsize=10)
 
-    fig_corner.subplots
-    
-    
+                # Invisibilité des axes intérieurs redondants
+                if i < 2: ax.tick_params(labelbottom=False)
+                if j > 0 or i == 0: ax.tick_params(labelleft=False)
+
+        # CORRECTION : Ligne ajustée proprement
+        fig_corner.subplots_adjust(left=0.1, bottom=0.1, right=0.95, top=0.92, wspace=0.1, hspace=0.1)
+
+    # L'affichage global (Attention à bien le sortir de la boucle "for sf in selected_subfaults")
+    print("\nGénération terminée. Affichage des fenêtres...")
     plt.show()
