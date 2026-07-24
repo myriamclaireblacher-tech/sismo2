@@ -14,9 +14,9 @@ int main() {
                         EXTRACT GREEN MATRIX
     -----------------------------------------------------------------------------------------------------------------------
     */
-    Eigen::Matrix<double, 3*Nstations, NSubFaults> G;
+    Eigen::Matrix<double, 2*Nstations, NSubFaults> G;
     //adresse de G
-    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_4x8subfault_12statsions.txt");
+    std::ifstream file("../../FortranCodes_Myriam/GreensFunctionsV1/G_matrix_8x16subfault_12statsions.txt");
     if (!file.is_open()) {
         std::cerr << "Error : Open file." << std::endl;
         return 1;
@@ -53,7 +53,7 @@ int main() {
     pP.reserve(NSubFaults);
 
 
-    Eigen::Matrix<double, 3*Nstations, Eigen::Dynamic> RES_matrix(3*Nstations, t_list.size());
+    Eigen::Matrix<double, 2*Nstations, Eigen::Dynamic> RES_matrix(2*Nstations, t_list.size());
     Eigen::Matrix<double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> storage_matrix(NSubFaults, t_list.size());
 
 
@@ -110,8 +110,8 @@ int main() {
         0.001, 5.0, //a_sigma/k
         1e-6f, 1000,  //super_big_param
         1e-6f, 1,      //big_param
-        10000.0, 100, 100/4,
-        50000*3/2*0.2/2
+        10000.0, 2, 20,
+        50000*3/2*0.2
     );
 
     

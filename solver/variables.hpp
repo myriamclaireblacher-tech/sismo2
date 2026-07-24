@@ -11,8 +11,8 @@ constexpr int Nstations = 12 ;
 
 //constexpr int NSubFaults = 450 ;
 
-constexpr int n_m =4;
-constexpr int m_n= 8;
+constexpr int n_m =8;
+constexpr int m_n= 16;
 
 constexpr int NSubFaults = n_m*m_n ;
 
