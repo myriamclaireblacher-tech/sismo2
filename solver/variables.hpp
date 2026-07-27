@@ -19,6 +19,8 @@ constexpr int NSubFaults = n_m*m_n ;
 constexpr int NCPU = 6 ;
                     //6
 
+constexpr COCO= - (std::log(0.05)+0.5*std::log(2*std::acos(-1.0)))*300*2*NSubFaults ;
+
 constexpr  double coco=1/NSubFaults ;         
 
 #endif

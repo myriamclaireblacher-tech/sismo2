@@ -66,7 +66,7 @@ double llk_easy (Eigen::Matrix<double, 2*Nstations, Eigen::Dynamic>& data, std::
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
 
         direct(t_list, PT, G, RES_matrix, storage_matrix) ;
-        double llk=  - (data - RES_matrix).array().abs().sum()*100;
+        double llk=  COCO - (data - RES_matrix).array().abs().sum();
         if (std::isnan(llk)) return -1e9f;
         return llk ;
     }
@@ -76,7 +76,7 @@ double llk_easy_i (int index, Eigen::Matrix<double, 2*Nstations, Eigen::Dynamic>
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
 
         directi(index, t_list, PT, G, RES_matrix, storage_matrix) ;
-        double llk=  - (data - RES_matrix).array().abs().sum()*100;
+        double llk= COCO - (data - RES_matrix).array().abs().sum();
         if (std::isnan(llk)) return -1e9f;
         return llk ;
     } 
@@ -86,7 +86,7 @@ double llk_easy_ii (std::vector<int> indexes, Eigen::Matrix<double, 2*Nstations,
     Eigen::Matrix <double, NSubFaults, Eigen::Dynamic, Eigen::RowMajor> & storage_matrix){
 
         directii(indexes, t_list, PT, G, RES_matrix, storage_matrix) ;
-        double llk=  - (data - RES_matrix).array().abs().sum()*100;
+        double llk=  COCO - (data - RES_matrix).array().abs().sum();
         if (std::isnan(llk)) return -1e9f;
         return llk ;
     } 
